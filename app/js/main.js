@@ -190,7 +190,11 @@ async function viewRace(date, jcd, rno, fresh) {
     <span class="switch"><input type="checkbox" id="ex1" ${prefs.excludeBoat1First ? 'checked' : ''}><span></span></span></label></div>`;
 
   // 買い目
-  if (!pred.ok) html += `<div class="card"><div class="note warn">${esc(pred.reason)}</div></div>`;
+  if (!pred.ok) {
+    const past = dl && now >= dl && !race.racelist?.data;
+    const msg = past ? 'このレースは締切前に出走表を取得できなかったため、予想はありません(アプリが動き始める前のレースなど)。締切後に予想を作ると「後出し」になるため、作りません。' : pred.reason;
+    html += `<div class="card"><div class="note ${past ? 'info' : 'warn'}">${esc(msg)}</div></div>`;
+  }
   else {
     const list = bets.bets.map((b, i) => `<li class="${resCombo === b.combo ? 'hit' : ''}"><span class="rank">${i + 1}</span>${combo(b.combo)}
       <span class="p"><b>${pct(b.p)}</b><br><span class="small muted">${b.odds != null ? `オッズ ${b.odds.toFixed(1)}` : 'オッズ未取得'}${b.ev != null ? ` / 期待値 ${b.ev.toFixed(2)}` : ''}</span></span></li>`).join('');
