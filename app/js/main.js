@@ -183,6 +183,7 @@ async function viewRace(date, jcd, rno, fresh) {
     const r = savePredictionVersion(makeRecord({ date, jcd, rno, deadline: race.deadline, pred, betsRes: bets, prefs, race }));
     saveMsg = r.error ? `<div class="note bad">${esc(r.error)}</div>` : `<p class="small muted">この予想は端末に自動保存しました(第${r.record.version}版 ${fmtTime(r.record.savedAt)})。データや設定が変わると新しい版として追加保存し、前の版は書き換えません。</p>`;
   } else if (pred.ok) saveMsg = '<p class="small muted">締切後のため、新しい版は保存しません(後出しを防ぐため)。</p>';
+  const lateData = pred.ok && dl && race.racelist?.fetchedAt && Date.parse(race.racelist.fetchedAt) >= dl;
 
   // 設定
   html += `<div class="card"><div class="seg" role="group" aria-label="モード">${Object.entries(MODES).map(([k, m]) => `<button data-mode="${k}" class="${prefs.mode === k ? 'on' : ''}">${k} ${m.label}<small>${k === 'A' ? '当たりやすさ' : k === 'B' ? '確率×オッズ' : '高配当'}</small></button>`).join('')}</div>
@@ -192,13 +193,14 @@ async function viewRace(date, jcd, rno, fresh) {
   // 買い目
   if (!pred.ok) {
     const past = dl && now >= dl && !race.racelist?.data;
-    const msg = past ? 'このレースは締切前に出走表を取得できなかったため、予想はありません(アプリが動き始める前のレースなど)。締切後に予想を作ると「後出し」になるため、作りません。' : pred.reason;
+    const msg = past ? 'このレースは出走表を取得していないため、予想はありません(アプリが動き始める前に締切を過ぎたレース)。締切後に出走表を取り直すことはしていません。' : pred.reason;
     html += `<div class="card"><div class="note ${past ? 'info' : 'warn'}">${esc(msg)}</div></div>`;
   }
   else {
     const list = bets.bets.map((b, i) => `<li class="${resCombo === b.combo ? 'hit' : ''}"><span class="rank">${i + 1}</span>${combo(b.combo)}
       <span class="p"><b>${pct(b.p)}</b><br><span class="small muted">${b.odds != null ? `オッズ ${b.odds.toFixed(1)}` : 'オッズ未取得'}${b.ev != null ? ` / 期待値 ${b.ev.toFixed(2)}` : ''}</span></span></li>`).join('');
     html += `<div class="card"><h2>買い目(${MODES[prefs.mode].label}・${bets.bets.length}点)</h2>
+      ${lateData ? `<div class="note bad">この予想は、締切後(${fmtTime(race.racelist.fetchedAt)})に取得した出走表で計算した<b>参考</b>です。レース前の予想ではないため、成績には入りません。</div>` : ''}
       ${bets.warnings.map((w) => `<div class="note warn">${esc(w)}</div>`).join('')}
       ${list ? `<ul class="bets">${list}</ul>` : ''}
       ${bets.bets.length ? `<p class="small muted">この買い目のどれかが当たる推定確率: <b>${pct(bets.hitProb)}</b>${bets.avgEv != null ? ` / 平均期待値 ${bets.avgEv.toFixed(2)}` : ''}(各100円の場合 合計${bets.bets.length * 100}円)</p>` : ''}
