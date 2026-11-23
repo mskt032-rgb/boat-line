@@ -127,8 +127,10 @@ async function viewVenue(date, jcd, fresh) {
       resultHtml = `<span class="chip ${j?.hit ? 'ok' : ''}">結果 ${res}${j ? (j.hit ? ' 的中' : '') : ''}</span>`;
     }
     items.push(`<li><a href="#/r/${date}/${jcd}/${r}"><span class="rno">${r}R</span><span class="dl">${esc(race.deadline || '--:--')}</span>
-      <span class="chips">${resultHtml || [statusChip('racelist', '出走表', race.racelist), statusChip('before', '展示', race.before), statusChip('odds', 'オッズ', race.odds)].join('')}
-      ${saved.length ? '<span class="chip ok">予想保存</span>' : ''}${dl && dl < now && !res ? '<span class="chip">締切済</span>' : ''}</span></a></li>`);
+      <span class="chips">${resultHtml || (dl && dl < now
+        ? (race.result?.canceled ? '<span class="chip">中止</span>' : '<span class="chip wait">結果 取得待ち</span>')
+        : [statusChip('racelist', '出走表', race.racelist), statusChip('before', '展示', race.before), statusChip('odds', 'オッズ', race.odds)].join(''))}
+      ${saved.length ? '<span class="chip ok">予想保存</span>' : ''}</span></a></li>`);
   }
   app.innerHTML = `${head}<div class="card" style="padding:0 4px"><ul class="races">${items.join('')}</ul></div>
     <p class="small muted">更新: ${fmtTime(vd.updatedAt)}。開いている間は2分ごとに最新に更新します。</p>`;
