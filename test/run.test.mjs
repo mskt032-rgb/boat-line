@@ -116,3 +116,16 @@ test('robots.txt が取れないときは何も取得しない', async () => {
   assert.equal(site.calls.length, 1);
   assert.match(log.stopped, /robots/);
 });
+
+test('以前に保存した「246日目」などの表記を直して保存し直す', async () => {
+  const store = tmp();
+  const site = fakeSite();
+  const now = deadlineMs(D, '07:00');
+  await runOnce(opts(store, site, now));
+  const f = path.join(store, D, 'day.json');
+  const day = JSON.parse(fs.readFileSync(f, 'utf8'));
+  day.venues.find((v) => v.jcd === '02').dayLabel = '246日目';
+  fs.writeFileSync(f, JSON.stringify(day));
+  await runOnce(opts(store, site, now + 5 * 60000));
+  assert.equal(read(store, `${D}/day.json`).venues.find((v) => v.jcd === '02').dayLabel, '6日目');
+});

@@ -89,7 +89,7 @@ async function viewHome(date, fresh) {
       next = upcoming ? `次 ${upcoming.rno}R 締切 ${upcoming.deadline}` : Object.keys(vd.races).length ? '本日のレース終了' : '';
     } else next = '出走表 取得待ち';
     return `<a class="venue" href="#/v/${date}/${x.jcd}"><div class="name">${esc(x.name)}</div>
-      <div class="sub">${esc([x.dayLabel, x.title].filter(Boolean).join(' '))}${x.note ? ` <b>${esc(x.note)}</b>` : ''}</div>
+      <div class="sub">${esc([(x.dayLabel || '').replace(/^.*?(初日|最終日|[1-9]日目)$/, '$1') || null, x.title].filter(Boolean).join(' '))}${x.note ? ` <b>${esc(x.note)}</b>` : ''}</div>
       <div class="next">${esc(next)}</div></a>`;
   }).join('');
   const ix = day.index || {};

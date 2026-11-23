@@ -4,7 +4,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { parseIndex, parseRacelist, parseBeforeinfo, parseOdds3t, parseResult } from './parse.mjs';
+import { cleanDayLabel, parseIndex, parseRacelist, parseBeforeinfo, parseOdds3t, parseResult } from './parse.mjs';
 import { parseRobots, robotsFor } from './robots.mjs';
 import { planTasks, needIndex } from './plan.mjs';
 import { jstDate, addDays, isoNow } from '../app/js/time.js';
@@ -103,8 +103,14 @@ export async function runOnce({
   // 日ごとのデータを読み込む(今日と、結果待ちがあるかもしれない昨日)
   const dayDocs = {};
   const venueDocs = {};
+  const dirty = new Set();
   const loadDay = (d) => {
     dayDocs[d] = readJson(path.join(store, d, 'day.json'), null);
+    // 以前の版で保存した表記の誤りを直す
+    for (const v of dayDocs[d]?.venues || []) {
+      const fixed = cleanDayLabel(v.dayLabel);
+      if (fixed !== v.dayLabel) { v.dayLabel = fixed; dirty.add(`${d}/day`); }
+    }
     venueDocs[d] = {};
     for (const v of dayDocs[d]?.venues || []) {
       if (v.held) venueDocs[d][v.jcd] = readJson(path.join(store, d, `${v.jcd}.json`), { date: d, jcd: v.jcd, name: v.name, races: {} });
@@ -112,7 +118,6 @@ export async function runOnce({
   };
   loadDay(today);
   loadDay(addDays(today, -1));
-  const dirty = new Set();
   const markDirty = (d, jcd) => dirty.add(`${d}/${jcd}`);
   const saveAll = () => {
     for (const key of dirty) {

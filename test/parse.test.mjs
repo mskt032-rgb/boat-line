@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { parseIndex, parseRacelist, parseBeforeinfo, parseOdds3t, parseResult, combosForFirst, norm } from '../scraper/parse.mjs';
+import { cleanDayLabel, parseIndex, parseRacelist, parseBeforeinfo, parseOdds3t, parseResult, combosForFirst, norm } from '../scraper/parse.mjs';
 import { indexHtml, racelistHtml, beforeinfoHtml, oddsHtml, resultHtml } from './fixtures/html.mjs';
 
 test('全角数字・全角空白をそろえる', () => {
@@ -112,4 +112,11 @@ test('結果: 未発表と中止', () => {
   assert.equal(parseResult('<html><body>データがありません</body></html>').ready, false);
   const c = parseResult(resultHtml({ canceled: true }));
   assert.equal(c.canceled, true);
+});
+
+test('開催日数の表記の修正', () => {
+  assert.equal(cleanDayLabel('246日目'), '6日目');
+  assert.equal(cleanDayLabel('3日目'), '3日目');
+  assert.equal(cleanDayLabel('初日'), '初日');
+  assert.equal(cleanDayLabel(null), null);
 });
