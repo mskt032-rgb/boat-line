@@ -3,7 +3,7 @@
 // 2) 進入後のコース並びから「逃げ・差し・まくり・まくり差し・抜きほか」の展開確率を出す
 // 3) 展開ごとに2着・3着の出やすさを掛け合わせ、3連単120通りの確率(合計100%)を出す
 
-export const MODEL_VERSION = '1.0';
+export const MODEL_VERSION = '1.1';
 
 /** 全120通り(1着→2着→3着の昇順) */
 export const ALL_COMBOS = (() => {
@@ -64,7 +64,7 @@ export function collectInputs(race) {
       boat2: isNum(e?.boat2) && e.boat2 > 0 ? e.boat2 : null,
       exTime: isNum(ex?.exTime) ? ex.exTime : null,
       avgST: isNum(e?.avgST) && e.avgST > 0 ? e.avgST : null,
-      exST: isNum(st?.st) ? Math.max(st.st, -0.1) : null,
+      exST: isNum(st?.st) ? Math.max(st.st, 0) : null, // 展示のフライングは「速すぎ」ではなく0.00として扱う
       fPenalty: isNum(e?.F) ? -e.F : null,
       F: e?.F ?? null,
       course: st?.course ?? null,

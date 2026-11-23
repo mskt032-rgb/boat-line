@@ -10,7 +10,7 @@ test('全角数字・全角空白をそろえる', () => {
 test('開催場一覧: その日の場だけを拾う', () => {
   const r = parseIndex(indexHtml('20261123', ['02', '12', '24']), '20261123');
   assert.deepEqual(r.venues.map((v) => v.jcd), ['02', '12', '24']);
-  assert.equal(r.venues[0].dayLabel, '2日目');
+  assert.equal(r.venues[0].dayLabel, '3日目'); // 日付「11/26」と「3日目」がくっついても正しく読む
   assert.equal(r.venues[0].grade, 'G3');
   assert.match(r.venues[0].title, /テスト杯/);
 });

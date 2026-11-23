@@ -1,5 +1,5 @@
 // 定期実行で1回分の取得を行い、JSONに保存する。
-// 方針: robots.txt を毎回確認し許可された場所だけ、3秒以上の間隔で、1回あたりの件数に上限を設ける。
+// 方針: robots.txt を毎回確認し許可された場所だけ、3秒以上の間隔、1回あたり最大160件・8分まで(10分ごとの実行が重ならないように)。
 // 403/429/503 など「アクセスを控えて」という応答があれば、その回は即座にやめて30分休む(回避はしない)。
 import fs from 'node:fs';
 import path from 'node:path';
@@ -41,7 +41,7 @@ export async function defaultFetchText(url) {
 
 export async function runOnce({
   store, now = Date.now(), fetchText = defaultFetchText, maxRequests = 160, intervalMs = 3000,
-  timeBudgetMs = 12 * 60000, sleep = (ms) => new Promise((r) => setTimeout(r, ms)), clock = () => Date.now(),
+  timeBudgetMs = 8 * 60000, sleep = (ms) => new Promise((r) => setTimeout(r, ms)), clock = () => Date.now(),
 }) {
   const startedAt = clock();
   const statePath = path.join(store, 'meta', 'state.json');
