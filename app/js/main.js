@@ -193,7 +193,7 @@ async function viewRace(date, jcd, rno, fresh) {
   // 買い目
   if (!pred.ok) {
     const past = dl && now >= dl && !race.racelist?.data;
-    const msg = past ? 'このレースは出走表を取得していないため、予想はありません(アプリが動き始める前に締切を過ぎたレース)。締切後に出走表を取り直すことはしていません。' : pred.reason;
+    const msg = past ? 'このレースの出走表はまだ取得できていません。終わったレースの出走表は、締切前のレースの取得が済んだあとに順番に取りにいきます。取得できると、参考の予想が出ます。' : pred.reason;
     html += `<div class="card"><div class="note ${past ? 'info' : 'warn'}">${esc(msg)}</div></div>`;
   }
   else {

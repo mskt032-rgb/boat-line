@@ -36,6 +36,17 @@ test('結果が出たら取りにいかない・回数上限', () => {
   assert.equal(planTasks([{ date: D, venues: { '02': { races } } }], at('12:00')).length, 0);
 });
 
+test('終わったレースの出走表は、いちばん最後にあとから取得する(30時間以内)', () => {
+  const races = {
+    1: { rno: 1, deadline: '10:30', result: { ready: true } },
+    2: { rno: 2, deadline: '13:00', racelist: { status: 'ok' } },
+    3: { rno: 3, deadline: '10:40', result: { ready: true }, racelist: { status: 'error', attemptedAt: new Date(at('11:50')).toISOString() } },
+  };
+  const t = planTasks([{ date: D, venues: { '02': { races } } }], at('12:00'));
+  assert.deepEqual(t.map((x) => `${x.type}${x.rno}`), ['racelist1']);
+  assert.equal(planTasks([{ date: D, venues: { '02': { races } } }], at('12:00') + 31 * 3600000).length, 0);
+});
+
 test('締切が近い順', () => {
   const races = {};
   for (let r = 1; r <= 12; r++) races[r] = { rno: r, deadline: `${10 + r}:00` };
