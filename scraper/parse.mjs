@@ -41,8 +41,8 @@ export function parseIndex(html, date) {
     const t = norm($(a).text());
     if (t && t.length > (v.title?.length || 0) && !/^\d+R$/.test(t) && !/出走表|結果|オッズ/.test(t)) v.title = t;
     const rowText = norm(row.text());
-    const dm = rowText.match(/(初日|最終日|\d+日目)/);
-    if (dm) v.dayLabel = dm[1];
+    const dm = rowText.match(/(初日|最終日|[1-9]日目)/); // 直前の日付の数字とくっつくことがあるので1桁だけ見る
+    if (dm) v.dayLabel = dm[1].replace(/^\d*?([1-9]日目)$/, '$1');
     if (/中止|順延|打ち切り/.test(rowText)) v.note = (rowText.match(/(中止[^ ]*|順延[^ ]*|打ち切り[^ ]*)/) || [])[1] || '中止等';
     const cls = (row.find('[class*="is-"]').map((_, e) => $(e).attr('class')).get().join(' ') + ' ' + (row.attr('class') || ''));
     const g = cls.match(/is-(SGa|SG|G1a|G1b|G1|G2|G3|ippan)\b/);

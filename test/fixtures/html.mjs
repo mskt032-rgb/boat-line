@@ -8,7 +8,7 @@ export const TIMES = ['10:30', '11:00', '11:28', '11:56', '12:24', '12:52', '13:
 
 export function indexHtml(date, jcds) {
   const rows = jcds.map((j) => `<tbody class="is-G3"><tr><td><a href="/owpc/pc/race/raceindex?jcd=${j}&hd=${date}"><img alt="場${j}"></a></td>
-    <td class="is-alignL"><a href="/owpc/pc/race/raceindex?jcd=${j}&hd=${date}">第${j}回 テスト杯</a></td><td>２日目</td></tr></tbody>`).join('');
+    <td class="is-alignL"><a href="/owpc/pc/race/raceindex?jcd=${j}&hd=${date}">第${j}回 テスト杯</a></td><td>11/22-11/26</td><td>3日目</td></tr></tbody>`).join('');
   return `<html><body><div class="table1"><table>${rows}</table></div>
     <a href="/owpc/pc/race/raceindex?jcd=99&hd=20000101">old</a></body></html>`;
 }
