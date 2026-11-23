@@ -1,0 +1,15 @@
+{
+  "name": "boat-line",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "BOAT LINE: iPhone向け競艇予想Webアプリ(静的サイト)",
+  "scripts": {
+    "test": "node --test test/*.test.mjs",
+    "fetch": "node scraper/run.mjs"
+  },
+  "engines": { "node": ">=20" },
+  "dependencies": {
+    "cheerio": "1.0.0"
+  }
+}

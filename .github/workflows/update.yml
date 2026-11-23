@@ -1,0 +1,60 @@
+# BOAT RACE公式サイトから情報を取得し、GitHub Pagesで公開する
+# - 日本時間 6:04〜22:54 のあいだ10分ごと(GitHubの混雑で数分〜十数分遅れることがあります)
+# - 取得したデータは data ブランチに保存(毎回1つのコミットに置き換え、容量を増やさない)
+name: データ更新と公開
+on:
+  schedule:
+    - cron: '4,14,24,34,44,54 21-23,0-13 * * *'
+  workflow_dispatch:
+  push:
+    branches: [main]
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+concurrency:
+  group: boatline-update
+  cancel-in-progress: false
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+      - name: 前回までのデータを読み込む
+        run: |
+          mkdir -p store
+          if git ls-remote --exit-code origin refs/heads/data >/dev/null 2>&1; then
+            git fetch -q --depth 1 origin data
+            git archive FETCH_HEAD | tar -x -C store
+          fi
+      - name: 公式サイトから取得
+        run: node scraper/run.mjs store/data
+      - name: データを data ブランチに保存
+        run: |
+          cd store
+          git init -q -b data
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -qm "data $(date -u +%Y-%m-%dT%H:%MZ)"
+          git push -qf "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" data
+      - name: 公開用ファイルをまとめる
+        run: |
+          mkdir -p _site
+          cp -r app/. _site/
+          cp -r store/data _site/data
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+      - id: deploy
+        uses: actions/deploy-pages@v4
