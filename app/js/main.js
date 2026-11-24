@@ -190,6 +190,7 @@ async function viewRace(date, jcd, rno, fresh) {
     <label class="toggle"><span>1号艇1着なし<br><span class="small muted">オンにすると、1号艇が1着の買い目を除きます</span></span>
     <span class="switch"><input type="checkbox" id="ex1" ${prefs.excludeBoat1First ? 'checked' : ''}><span></span></span></label></div>`;
 
+  html += gradedCard(date, jcd, rno, dl, race, now); // 締切後は成績に使った予想を先に出す
   // 買い目
   if (!pred.ok) {
     const past = dl && now >= dl && !race.racelist?.data;
@@ -256,6 +257,23 @@ async function viewRace(date, jcd, rno, fresh) {
   app.querySelectorAll('[data-mode]').forEach((b) => b.addEventListener('click', () => { setPrefs({ mode: b.dataset.mode }); viewRace(date, jcd, rno); }));
   app.querySelector('#ex1')?.addEventListener('change', (e) => { setPrefs({ excludeBoat1First: e.target.checked }); viewRace(date, jcd, rno); });
   autoRefresh((f) => viewRace(date, jcd, rno, f));
+}
+
+// 締切後: 成績に使った予想(締切前に記録したもの)の買い目と的中を出す
+function gradedCard(date, jcd, rno, dl, race, now) {
+  if (!dl || now < dl) return '';
+  const res = race.result?.status === 'ok' ? race.result.data?.trifecta?.combo : null;
+  const list = (combos) => combos?.length ? `<ul class="bets">${combos.map((c, i) => `<li class="${c === res ? 'hit' : ''}"><span class="rank">${i + 1}</span>${combo(c, true)}<span class="p">${c === res ? '<b class="pos">的中</b>' : ''}</span></li>`).join('')}</ul>` : '<p class="na">買い目なし</p>';
+  const block = (title, note, on, off) => `<h3>${title}</h3><p class="small muted">${note}</p>
+    <details ${on?.includes(res) ? 'open' : ''}><summary>1号艇1着なし(${on?.length ?? 0}点)${on?.includes(res) ? ' — 的中' : ''}</summary>${list(on)}</details>
+    <details ${off?.includes(res) ? 'open' : ''}><summary>1号艇1着あり(${off?.length ?? 0}点)${off?.includes(res) ? ' — 的中' : ''}</summary>${list(off)}</details>`;
+  let h = '';
+  if (race.auto) h += block('全レース自動記録の予想(モードA)', `締切前 ${fmtTime(race.auto.savedAt)} に記録${race.auto.reflect?.exhibition ? '(展示入り)' : '(展示なし)'}`, race.auto.bets?.A_on, race.auto.bets?.A_off);
+  const fv = finalVersion(predictionsFor(date, jcd, rno), dl);
+  if (fv) { const c = compareExclusion(fv, race.result); h += block('この端末で保存した予想(モードA)', `第${fv.version}版・締切前 ${fmtTime(fv.savedAt)} に保存${fv.reflect?.exhibition ? '(展示入り)' : '(展示なし)'}`, c.on.bets.map((b) => b.combo), c.off.bets.map((b) => b.combo)); }
+  if (!h) return '';
+  return `<div class="card"><h2>成績に使った予想${res ? ` — 結果 ${combo(res, true)}` : ''}</h2>${h}
+    <p class="small muted">下の「買い目」は、いまのデータ(締切時のオッズなど)で計算し直した参考です。成績には、ここに出ている締切前の予想を使っています。</p></div>`;
 }
 
 function detailTables(race) {
