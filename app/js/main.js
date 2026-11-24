@@ -339,6 +339,21 @@ function versionsCard(date, jcd, rno, dl, race) {
 }
 
 // ---------- 成績 ----------
+// 日ごとの成績(新しい日が上)
+function dayTable(rows) {
+  const dates = [...new Set(rows.map((r) => r.date))].sort().reverse();
+  const c = (x) => (x.races ? `${pct(x.hitRate, 0)}<br><span class="na">回収</span> <b>${pct(x.recovery, 0)}</b>` : '<span class="na">—</span>');
+  const body = dates.map((d) => {
+    const rs = rows.filter((r) => r.date === d);
+    const on = summarizeAutolog(rs, 'A_on'), off = summarizeAutolog(rs, 'A_off'), bon = summarizeAutolog(rs, 'B_on'), boff = summarizeAutolog(rs, 'B_off');
+    if (!on.races && !off.races) return '';
+    return `<tr><td class="l">${fmtDate(d)}<br><span class="na">${Math.max(on.races, off.races)}R</span></td><td>${c(on)}</td><td>${c(off)}</td><td>${c(bon)}</td><td>${c(boff)}</td></tr>`;
+  }).join('');
+  if (!body) return '';
+  return `<h3>日ごとの成績</h3><div class="tbl-wrap"><table class="t"><thead><tr><th class="l">日付</th><th>A<br>1着なし</th><th>A<br>1着あり</th><th>B・C<br>1着なし</th><th>B・C<br>1着あり</th></tr></thead><tbody>${body}</tbody></table></div>
+    <p class="small muted">上の段が的中率、下の段が回収率です。</p>`;
+}
+
 async function autoCard() {
   const idx = await getJson('index.json');
   const dates = (idx?.dates || []).slice(0, 45);
@@ -358,6 +373,7 @@ async function autoCard() {
     <p class="small">画面を開かなくても、全レースの締切直前の予想を自動で記録しています。展示入りの割合: ${pct(a.exhibitionShare, 0)}</p>
     <div class="tbl-wrap"><table class="t"><thead><tr><th class="l">モード</th><th>1号艇1着<br>なし</th><th>1号艇1着<br>あり</th></tr></thead><tbody>${line('A')}${line('B')}${line('C')}</tbody></table></div>
     <p class="small muted">各買い目100円。B・Cはオッズが取れたレースだけで集計。</p>
+    ${dayTable(rows)}
     <details><summary>レースごとの結果(${done.length}件・モードA)</summary><div class="tbl-wrap"><table class="t"><thead><tr><th class="l">レース</th><th>結果</th><th>1号艇1着<br>なし</th><th>1号艇1着<br>あり</th></tr></thead><tbody>${list}</tbody></table></div></details></div>`;
 }
 
