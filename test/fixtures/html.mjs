@@ -24,7 +24,7 @@ export function racelistHtml(opts = {}) {
     <td rowspan="4">${nat[i]}<br>4${n}.00<br>6${n}.00</td>
     <td rowspan="4">${i === 5 ? '0.00' : '6.00'}<br>40.00<br>55.00</td>
     <td rowspan="4">${10 + n}<br>${30 + n * 2}.50<br>50.00</td>
-    <td rowspan="4">${20 + n}<br>35.00<br>50.00</td><td>3</td><td>9</td><td></td><td rowspan="4">早見</td></tr>
+    <td rowspan="4">${20 + n}<br>35.00<br>50.00</td><td></td><td>3</td><td>9</td><td></td><td rowspan="4">早見</td></tr>
     <tr><td class="is-boatColor${n}">${n}</td><td>4</td><td></td></tr><tr><td>.15</td><td>F.02</td><td></td></tr><tr><td>${'０１２３４５６'[n]}</td><td>１</td><td></td></tr></tbody>`).join('');
   return `<html><body><h3 class="title16_titleDetail__add2020">予選　　　1800m</h3>${deadlinesRow(TIMES)}
     <div class="table1 is-tableFixed__3rdadmin"><table><thead><tr><th>枠</th></tr></thead>${body}</table></div></body></html>`;

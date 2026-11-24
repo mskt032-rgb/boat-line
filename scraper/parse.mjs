@@ -93,7 +93,7 @@ function raceMeta($) {
 export function parseKonsetsu($, tb) {
   const trs = $(tb).find('tr');
   const cellText = (td) => norm($(td).text());
-  const row0 = trs.eq(0).children('td').slice(8).map((_, td) => cellText(td)).get();
+  const row0 = trs.eq(0).children('td').slice(9) /* 実データでは見出し用の1列が先にある */.map((_, td) => cellText(td)).get();
   const rows = [1, 2, 3].map((i) => trs.eq(i).children('td').map((_, td) => cellText(td)).get());
   const n = rows[0].length;
   const races = [];
