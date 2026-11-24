@@ -52,6 +52,14 @@ export function collectInputs(race, racers = {}) {
   const before = race?.before?.status === 'ok' ? race.before.data : null;
   const exByBoat = Object.fromEntries((before?.boats || []).map((b) => [b.boat, b]));
   const stByBoat = Object.fromEntries((before?.start || []).map((s) => [s.boat, s]));
+  // 欠場の見分け: 出走表・直前情報の「欠場」、またはオッズでその艇を含む組だけが全部出ていない
+  const odds = race?.odds?.status === 'ok' ? race.odds.data?.odds : null;
+  const absentByOdds = (n) => {
+    if (!odds) return false;
+    const mine = Object.entries(odds).filter(([c]) => c.split('-').includes(String(n)));
+    const others = Object.entries(odds).filter(([c]) => !c.split('-').includes(String(n)));
+    return mine.length > 0 && mine.every(([, v]) => v == null) && others.some(([, v]) => v != null);
+  };
   const boats = [];
   for (let n = 1; n <= 6; n++) {
     const e = entries.find((x) => x.boat === n);
@@ -63,7 +71,8 @@ export function collectInputs(race, racers = {}) {
     const pct = (x) => (isNum(x) ? (x > 1 ? x / 100 : x) : null);
     boats.push({
       boat: n,
-      present: !!e && !e.absent,
+      present: !!e && !e.absent && !ex?.absent && !absentByOdds(n),
+      absent: !!e && (e.absent || !!ex?.absent || absentByOdds(n)),
       name: e?.name ?? null,
       cls: e?.cls ?? null,
       natWin: isNum(e?.natWin) && e.natWin > 0 ? e.natWin : null,
@@ -235,6 +244,7 @@ export function predictRace(race, opts = {}) {
     konsetsu: used.some((u) => u.factor === '今節の平均着順'),
     courseStats: used.some((u) => u.factor === 'そのコースでの3連対率' || u.factor === 'そのコースでの1着率'),
   };
+  for (const e of evals) if (e.absent) notes.push(`${e.boat}号艇は欠場のため、予想から外しています。`);
   for (const m of missing) notes.push(`「${m.factor}」は値が取れていないため予想に入れていません。`);
   for (const u of used) if (u.missingBoats.length) notes.push(`「${u.factor}」は${u.missingBoats.join('・')}号艇の値が無いため、その艇には反映していません。`);
   if (reflect.weather) notes.push('気象は風速・波高のみ小さく反映しています(風向きは反映していません)。');

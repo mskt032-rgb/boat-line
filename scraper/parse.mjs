@@ -195,6 +195,7 @@ export function parseBeforeinfo(html) {
       propeller: norm(tds.eq(6).text()) || null,
       parts: norm(tds.eq(7).text()) || null,
       adjustWeight: trs.eq(1).length ? num(trs.eq(1).children('td').first().text()) : null,
+      absent: /欠場/.test(norm($(tb).text())),
     });
   });
   const start = [];

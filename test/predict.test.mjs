@@ -133,3 +133,16 @@ test('締切時点の予想: 締切後に取得した直前情報・オッズは
   assert.equal(f.odds, null);
   assert.deepEqual(predictRace(f).probs, predictRace({ ...r, odds: null }).probs);
 });
+
+test('欠場: オッズでその艇の組だけ全部出ていなければ外す / 直前情報の欠場でも外す', () => {
+  const odds = flatOdds(30);
+  for (const c of Object.keys(odds)) if (c.split('-').includes('2')) odds[c] = null;
+  const p = predictRace(makeRace({ odds }));
+  assert.equal(p.winProb[2], 0);
+  assert.ok(ALL_COMBOS.filter((c) => c.includes('2')).every((c) => p.probs[c] === 0));
+  assert.ok(Math.abs(Object.values(p.probs).reduce((a, b) => a + b, 0) - 1) < 1e-9);
+  assert.ok(p.notes.some((n) => n.includes('2号艇は欠場')));
+  const r = makeRace({ withBefore: true });
+  r.before.data.boats[4].absent = true;
+  assert.equal(predictRace(r).winProb[5], 0);
+});
