@@ -1,7 +1,7 @@
 // BOAT LINE 画面の組み立て
 import { VENUES, VENUE_NAME } from './venues.js';
 import { jstDate, deadlineMs, jstParts } from './time.js';
-import { predictRace, selectBets, MODES, KIMARITE_ORDER, rankCombos, raceAtDeadline } from './predict.js';
+import { predictRace, selectBets, MODES, KIMARITE_ORDER, rankCombos, raceAtDeadline, ALL_COMBOS } from './predict.js';
 import { getPrefs, setPrefs, predictionsFor, savePredictionVersion, makeRecord, allPredictions, exportBackup, importBackup } from './store.js';
 import { finalVersion, judge, summarize, compareExclusion, summarizeAutolog } from './verify.js';
 
@@ -178,7 +178,12 @@ async function viewRace(date, jcd, rno, fresh) {
   const racerDocs = await Promise.all(regs.map((e) => getJson(`racers/${e.regNo}.json`)));
   const racers = {};
   regs.forEach((e, i) => { if (racerDocs[i]?.status === 'ok') racers[e.boat] = racerDocs[i]; });
-  const pred = predictRace(predRace, { racers });
+  // 締切後は、締切前に記録した予想をそのまま出す(計算方法を変えても過去の予想は変わらない)
+  const frozen = closed && race.auto?.view ? {
+    ok: true, modelVersion: race.auto.modelVersion, frozenAt: race.auto.savedAt,
+    probs: Object.fromEntries(ALL_COMBOS.map((c, i) => [c, race.auto.probs[i]])), winProb: race.auto.winProb, ...race.auto.view,
+  } : null;
+  const pred = frozen || predictRace(predRace, { racers });
   const odds = predRace.odds?.status === 'ok' ? predRace.odds.data.odds : null;
   const bets = selectBets(pred, odds, prefs);
   const result = race.result?.status === 'ok' ? race.result : null;
@@ -189,7 +194,9 @@ async function viewRace(date, jcd, rno, fresh) {
   if (pred.ok && (dl == null || now < dl)) {
     const r = savePredictionVersion(makeRecord({ date, jcd, rno, deadline: race.deadline, pred, betsRes: bets, prefs, race }));
     saveMsg = r.error ? `<div class="note bad">${esc(r.error)}</div>` : `<p class="small muted">この予想は端末に自動保存しました(第${r.record.version}版 ${fmtTime(r.record.savedAt)})。データや設定が変わると新しい版として追加保存し、前の版は書き換えません。</p>`;
-  } else if (pred.ok) saveMsg = '<p class="small muted">締切時点のデータで計算した予想です。締切後に取得したデータでは書き換えません。</p>';
+  } else if (pred.ok) saveMsg = pred.frozenAt
+    ? `<p class="small muted">締切前(${fmtTime(pred.frozenAt)})に記録した予想をそのまま表示しています。締切後は書き換えません。</p>`
+    : '<p class="small muted">締切前の記録が無いレースのため、締切時点のデータで計算し直した予想です(計算方法を変えると変わることがあります)。</p>';
   const lateData = pred.ok && dl && race.racelist?.fetchedAt && Date.parse(race.racelist.fetchedAt) >= dl;
 
   // 設定

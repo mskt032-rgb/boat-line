@@ -28,6 +28,12 @@ export function recordAutoPredictions(vdoc, date, nowMs, getRacer = () => null) 
       reflect: { exhibition: pred.reflect.exhibition, course: pred.reflect.course, odds: pred.reflect.odds, konsetsu: pred.reflect.konsetsu, courseStats: pred.reflect.courseStats },
       probs: ALL_COMBOS.map((c) => Math.round(pred.probs[c] * 1e6) / 1e6),
       winProb: pred.winProb, bets,
+      // 締切後の画面表示用に、そのときの予想の中身をそのまま残す
+      view: {
+        scenarios: pred.scenarios, topScenarios: pred.topScenarios, courseOf: pred.courseOf, courseSource: pred.courseSource,
+        reflect: pred.reflect, notes: pred.notes,
+        evals: pred.evals.map((e) => ({ boat: e.boat, present: e.present, name: e.name, cls: e.cls, score: e.score, byGroup: e.byGroup })),
+      },
     };
     changed = true;
   }

@@ -146,6 +146,8 @@ test('全レース自動記録: 締切前に記録し、締切後は書き換え
   await runOnce(opts(store, site, deadlineMs(D, '10:45')));
   v = read(store, `${D}/02.json`);
   assert.deepEqual(v.races[1].auto, before, '締切後は書き換えない');
+  assert.equal(before.view.evals.length, 6);
+  assert.ok(before.view.scenarios['逃げ'] > 0);
   const log = read(store, `${D}/autolog.json`);
   const row = log.rows.find((r) => r.jcd === '02' && r.rno === 1);
   assert.equal(row.result.combo, '3-1-4');
