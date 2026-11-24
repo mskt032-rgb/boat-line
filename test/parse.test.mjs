@@ -129,7 +129,9 @@ test('今節成績: R・進入・ST・着順', () => {
 test('コース別成績のページ', () => {
   const r = parseRacerCourse(racerCourseHtml());
   assert.equal(Object.keys(r.courses).length, 6);
-  assert.equal(r.courses['1'].win, 51);
+  assert.equal(r.courses['1'].ren3, 73);
   assert.equal(r.courses['6'].ren3, 38);
-  assert.equal(r.courses['2'].starts, 18);
+  assert.equal(r.courses['2'].st, 0.12);
+  assert.equal(r.courses['2'].entryRate, 18);
+  assert.equal(r.courses['1'].win, null);
 });

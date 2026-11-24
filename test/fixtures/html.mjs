@@ -74,6 +74,6 @@ export function resultHtml({ order = [3, 1, 4, 2, 5, 6], payout = '¥12,340', ca
 }
 
 export function racerCourseHtml() {
-  const rows = [1, 2, 3, 4, 5, 6].map((c) => `<tr><th>${c}コース</th><td>${20 - c}</td><td>${(60 - c * 9).toFixed(1)}%</td><td>${(70 - c * 8).toFixed(1)}%</td><td>${(80 - c * 7).toFixed(1)}%</td><td>0.1${c}</td></tr>`).join('');
-  return `<html><body><table><thead><tr><th>コース</th><th>出走数</th><th>1着率</th><th>2連対率</th><th>3連対率</th><th>平均ST</th></tr></thead><tbody>${rows}</tbody></table></body></html>`;
+  const tbl = (h, f) => `<table><thead><tr><th colspan="2">${h}</th></tr></thead><tbody>${[1, 2, 3, 4, 5, 6].map((c) => `<tr><td>${c}</td><td>${f(c)}</td></tr>`).join('')}</tbody></table>`;
+  return `<html><body>${tbl('コース別進入率', (c) => `${(20 - c).toFixed(1)}%`)}${tbl('コース別3連対率 :1着率 :2着率 :3着率', (c) => `${(80 - c * 7).toFixed(1)}%`)}${tbl('コース別平均スタートタイミング', (c) => `.1${c}`)}</body></html>`;
 }

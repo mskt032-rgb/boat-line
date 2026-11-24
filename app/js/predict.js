@@ -59,7 +59,7 @@ export function collectInputs(race, racers = {}) {
     const st = stByBoat[n];
     const kon = (e?.kon || []).filter((k) => k.rank != null);
     const course = st?.course ?? n; // 展示の進入が無ければ枠なり
-    const cs = racers?.[n]?.courses?.[course];
+    const cs = racers?.[n]?.schema === 2 ? racers[n].courses?.[course] : null; // 古い形式の保存データは使わない
     const pct = (x) => (isNum(x) ? (x > 1 ? x / 100 : x) : null);
     boats.push({
       boat: n,

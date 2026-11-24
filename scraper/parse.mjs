@@ -312,28 +312,29 @@ export function parseResult(html) {
   return { ready, canceled, order, trifecta, kimarite, start, refunds: [...new Set(refunds)], warnings };
 }
 
-/** 選手のコース別成績ページ。見出しの文字で列を探し、1〜6コースの行を読む(読めない値は null) */
+/** 選手のコース別成績ページ。項目ごとに小さな表(見出し + 1〜6コースの行)が並ぶ形を読む */
 export function parseRacerCourse(html) {
   const $ = cheerio.load(html);
   const warnings = [];
-  const courses = {};
-  let headers = null;
+  const tables = [];
   $('table').each((_, t) => {
-    const head = $(t).find('thead th, thead td').map((_, c) => norm($(c).text())).get();
-    if (!head.some((h) => /連対率|1着率|勝率/.test(h))) return;
+    const header = norm($(t).find('thead').text() || $(t).find('th').first().text());
+    const rows = {};
     $(t).find('tbody tr').each((_, tr) => {
       const cells = $(tr).children('th,td').map((_, c) => norm($(c).text())).get();
       const m = (cells[0] || '').match(/^([1-6])(?:コース)?$/);
       if (!m) return;
-      const nums = cells.map((c) => { const x = c.match(/-?\d+(?:\.\d+)?/); return x ? parseFloat(x[0]) : null; });
-      const pick = (re) => { const i = head.findIndex((h) => re.test(h)); return i >= 0 ? nums[i] ?? null : null; };
-      courses[m[1]] = {
-        starts: pick(/出走/), win: pick(/1着率|勝率/), ren2: pick(/2連対率|2連率/), ren3: pick(/3連対率|3連率/),
-        st: pick(/平均ST|ST/), raw: cells,
-      };
+      const v = (cells.slice(1).join(' ').match(/-?\d*\.?\d+/) || [])[0];
+      rows[m[1]] = v != null ? parseFloat(v) : null;
     });
-    if (Object.keys(courses).length) headers = head;
+    if (Object.keys(rows).length) tables.push({ header, rows, raw: $(t).find('tbody tr').first().children().map((_, c) => norm($(c).text())).get() });
   });
-  if (!Object.keys(courses).length) warnings.push('コース別成績の表が見つかりませんでした');
-  return { courses, headers, warnings };
+  const find = (re) => tables.find((t) => re.test(t.header));
+  const ren3 = find(/3連対率/), st = find(/平均ST|スタートタイミング/), entry = find(/進入率/), win = find(/^[^3]*1着率/);
+  const courses = {};
+  for (let c = 1; c <= 6; c++) {
+    courses[c] = { ren3: ren3?.rows[c] ?? null, st: st?.rows[c] ?? null, entryRate: entry?.rows[c] ?? null, win: win && win !== ren3 ? win.rows[c] ?? null : null };
+  }
+  if (!ren3) warnings.push('コース別3連対率の表が見つかりませんでした');
+  return { schema: 2, courses: ren3 ? courses : {}, tables: tables.map(({ header, raw }) => ({ header, raw })), warnings };
 }

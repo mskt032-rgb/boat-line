@@ -229,18 +229,18 @@ export async function runOnce({
       seen.add(toban);
       const file = path.join(racerDir, `${toban}.json`);
       const prev = readJson(file, null);
-      const fresh = prev && clock() - Date.parse(prev.attemptedAt || 0) < (prev.status === 'ok' ? 30 : 3) * 86400000;
+      const fresh = prev && prev.schema === 2 && clock() - Date.parse(prev.attemptedAt || 0) < (prev.status === 'ok' ? 30 : 3) * 86400000;
       if (fresh) continue;
       const p = PATHS.racerCourse(toban);
       const rec = { toban, attemptedAt: isoNow(clock()), source: BASE + p };
       try {
         const r = parseRacerCourse(await get(p));
-        Object.assign(rec, Object.keys(r.courses).length ? { status: 'ok', fetchedAt: isoNow(clock()), courses: r.courses, headers: r.headers } : { status: 'empty', warnings: r.warnings });
+        Object.assign(rec, Object.keys(r.courses).length ? { schema: 2, status: 'ok', fetchedAt: isoNow(clock()), courses: r.courses, tables: r.tables } : { schema: 2, status: 'empty', warnings: r.warnings, tables: r.tables });
       } catch (e) {
         if (e instanceof StopRun) throw e;
         Object.assign(rec, { status: 'error', error: e.message });
       }
-      writeJson(file, { ...(prev?.status === 'ok' && rec.status !== 'ok' ? prev : {}), ...rec });
+      writeJson(file, { ...(prev?.schema === 2 && prev?.status === 'ok' && rec.status !== 'ok' ? prev : {}), ...rec });
       racerFetched++;
     }
     runLog.racers = racerFetched;
