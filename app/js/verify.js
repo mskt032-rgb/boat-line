@@ -85,3 +85,19 @@ export function compareExclusion(rec, result) {
   }
   return out;
 }
+
+/** 全レース自動記録(autolog)の集計。key は 'A_on' など */
+export function summarizeAutolog(rows, key) {
+  let races = 0, hits = 0, stake = 0, ret = 0, exh = 0;
+  for (const r of rows) {
+    const bets = r.bets?.[key];
+    if (!bets || !r.result || r.result.canceled || !r.result.combo) continue;
+    races++;
+    if (r.reflect?.exhibition) exh++;
+    stake += bets.length * 100;
+    const refunded = r.result.refunds || [];
+    ret += bets.filter((c) => c.split('-').some((n) => refunded.includes(+n))).length * 100;
+    if (bets.includes(r.result.combo)) { hits++; ret += r.result.payout || 0; }
+  }
+  return { races, hits, hitRate: races ? hits / races : null, stake, ret, recovery: stake ? ret / stake : null, exhibitionShare: races ? exh / races : null };
+}

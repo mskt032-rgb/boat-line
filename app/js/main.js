@@ -3,7 +3,7 @@ import { VENUES, VENUE_NAME } from './venues.js';
 import { jstDate, deadlineMs, jstParts } from './time.js';
 import { predictRace, selectBets, MODES, KIMARITE_ORDER, rankCombos } from './predict.js';
 import { getPrefs, setPrefs, predictionsFor, savePredictionVersion, makeRecord, allPredictions, exportBackup, importBackup } from './store.js';
-import { finalVersion, judge, summarize, compareExclusion } from './verify.js';
+import { finalVersion, judge, summarize, compareExclusion, summarizeAutolog } from './verify.js';
 
 const app = document.getElementById('app');
 const DATA = './data';
@@ -305,12 +305,35 @@ function versionsCard(date, jcd, rno, dl, race) {
 }
 
 // ---------- 成績 ----------
+async function autoCard() {
+  const idx = await getJson('index.json');
+  const dates = (idx?.dates || []).slice(0, 45);
+  const logs = (await Promise.all(dates.map((d) => getJson(`${d}/autolog.json`)))).filter(Boolean);
+  const rows = logs.flatMap((l) => l.rows.map((r) => ({ ...r, date: l.date })));
+  if (!rows.length) return '<div class="card"><h2>全レース自動記録</h2><p class="small muted">まだ記録がありません。締切前のレースから順に、自動で記録していきます。</p></div>';
+  const line = (m) => {
+    const on = summarizeAutolog(rows, `${m}_on`), off = summarizeAutolog(rows, `${m}_off`);
+    const c = (x) => (x.races ? `<b>${pct(x.hitRate)}</b> <span class="na">${x.hits}/${x.races}</span><br>回収 <b>${pct(x.recovery, 0)}</b>` : '<span class="na">—</span>');
+    return `<tr><td class="l">${m} ${MODES[m].label}</td><td>${c(on)}</td><td>${c(off)}</td></tr>`;
+  };
+  const a = summarizeAutolog(rows, 'A_off');
+  const cell = (r, k) => { const b = r.bets?.[k]; if (!b) return '<span class="na">—</span>'; if (!r.result?.combo) return '—'; return b.includes(r.result.combo) ? `<b class="pos">◯ ${(r.result.payout || 0).toLocaleString()}円</b>` : '×'; };
+  const done = rows.filter((r) => r.result?.combo).sort((x, y) => (y.date + y.deadline).localeCompare(x.date + x.deadline));
+  const list = done.map((r) => `<tr><td class="l"><a href="#/r/${r.date}/${r.jcd}/${r.rno}">${+r.date.slice(6)}日 ${esc(VENUE_NAME[r.jcd])}${r.rno}R</a>${r.reflect?.exhibition ? '' : '<br><span class="na">展示なし</span>'}</td><td>${combo(r.result.combo, true)}</td><td>${cell(r, 'A_on')}</td><td>${cell(r, 'A_off')}</td></tr>`).join('');
+  return `<div class="card"><h2>全レース自動記録(締切直前の予想)</h2>
+    <p class="small">画面を開かなくても、全レースの締切直前の予想を自動で記録しています。展示入りの割合: ${pct(a.exhibitionShare, 0)}</p>
+    <div class="tbl-wrap"><table class="t"><thead><tr><th class="l">モード</th><th>1号艇1着<br>外す</th><th>1号艇1着<br>外さない</th></tr></thead><tbody>${line('A')}${line('B')}${line('C')}</tbody></table></div>
+    <p class="small muted">各買い目100円。B・Cはオッズが取れたレースだけで集計。</p>
+    <details><summary>レースごとの結果(${done.length}件・モードA)</summary><div class="tbl-wrap"><table class="t"><thead><tr><th class="l">レース</th><th>結果</th><th>外す</th><th>外さない</th></tr></thead><tbody>${list}</tbody></table></div></details></div>`;
+}
+
 async function viewStats() {
   setTab('stats');
   clearInterval(refreshTimer);
+  const autoHtml = await autoCard();
   const all = allPredictions();
   if (!all.length) {
-    app.innerHTML = '<h1>成績</h1><div class="card"><p>まだ保存した予想がありません。</p><p class="small muted">レースの画面を開くと、その時点の予想が自動で保存されます。結果が出ると自動で照合します。</p></div>';
+    app.innerHTML = '<h1>成績</h1>' + autoHtml + '<div class="card"><p>まだ保存した予想がありません。</p><p class="small muted">レースの画面を開くと、その時点の予想が自動で保存されます。結果が出ると自動で照合します。</p></div>';
     return;
   }
   app.innerHTML = '<h1>成績</h1><p class="muted">結果と照合しています…</p>';
@@ -348,7 +371,7 @@ async function viewStats() {
     <tr><td class="l">的中率</td><td><b>${pct(sOn.hitRate)}</b><br><span class="na">${sOn.hits}/${sOn.betRaces}</span></td><td><b>${pct(sOff.hitRate)}</b><br><span class="na">${sOff.hits}/${sOff.betRaces}</span></td></tr>
     <tr><td class="l">回収率</td><td><b>${pct(sOn.recovery, 0)}</b><br><span class="na">${sOn.ret.toLocaleString()}/${sOn.stake.toLocaleString()}円</span></td><td><b>${pct(sOff.recovery, 0)}</b><br><span class="na">${sOff.ret.toLocaleString()}/${sOff.stake.toLocaleString()}円</span></td></tr>
     </tbody></table></div><p class="small muted">締切前に保存した最終版の確率から、モードA(的中重視)で両方の買い目を作り直して比べています。各買い目100円。</p></div>`;
-  app.innerHTML = `<h1>成績</h1>${cmpCard}
+  app.innerHTML = `<h1>成績</h1>${autoHtml}<h2 style="margin:16px 0 8px">この端末で開いたレースの成績</h2>${cmpCard}
     <div class="card"><h2>全体(締切前の最終版で集計)</h2>
       <div class="stat"><div><b>${pct(s.hitRate)}</b><span>的中率<br>${s.hits}/${s.betRaces}レース</span></div>
       <div><b class="${s.recovery >= 1 ? 'pos' : ''}">${pct(s.recovery, 0)}</b><span>回収率<br>${s.ret.toLocaleString()}/${s.stake.toLocaleString()}円</span></div>

@@ -129,3 +129,25 @@ test('以前に保存した「246日目」などの表記を直して保存し�
   await runOnce(opts(store, site, now + 5 * 60000));
   assert.equal(read(store, `${D}/day.json`).venues.find((v) => v.jcd === '02').dayLabel, '6日目');
 });
+
+test('全レース自動記録: 締切前に記録し、締切後は書き換えない。結果と合わせて autolog を作る', async () => {
+  const store = tmp();
+  const site = fakeSite();
+  await runOnce(opts(store, site, deadlineMs(D, '07:00')));
+  let v = read(store, `${D}/02.json`);
+  assert.ok(v.races[1].auto, '朝の時点で記録される');
+  assert.equal(v.races[1].auto.reflect.exhibition, false);
+  await runOnce(opts(store, site, deadlineMs(D, '10:15')));
+  v = read(store, `${D}/02.json`);
+  const before = v.races[1].auto;
+  assert.equal(before.reflect.exhibition, true, '展示が入った予想に更新される');
+  assert.ok(before.bets.A_on.length > 0 && before.bets.A_off.length > 0 && before.bets.B_off);
+  await runOnce(opts(store, site, deadlineMs(D, '10:45')));
+  v = read(store, `${D}/02.json`);
+  assert.deepEqual(v.races[1].auto, before, '締切後は書き換えない');
+  const log = read(store, `${D}/autolog.json`);
+  const row = log.rows.find((r) => r.jcd === '02' && r.rno === 1);
+  assert.equal(row.result.combo, '3-1-4');
+  assert.equal(row.result.payout, 12340);
+  assert.ok(row.rankActual >= 1);
+});

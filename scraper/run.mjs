@@ -9,6 +9,7 @@ import { parseRobots, robotsFor } from './robots.mjs';
 import { planTasks, needIndex } from './plan.mjs';
 import { jstDate, addDays, isoNow } from '../app/js/time.js';
 import { VENUES, VENUE_NAME } from '../app/js/venues.js';
+import { recordAutoPredictions, buildAutolog } from './autopred.mjs';
 
 export const BASE = 'https://www.boatrace.jp';
 export const UA = 'BOAT-LINE-personal/1.0 (personal non-commercial use; +https://github.com/mskt032-rgb/boat-line)';
@@ -210,7 +211,16 @@ export async function runOnce({
     if (!(e instanceof StopRun)) { runLog.errors.push(`予期しないエラー: ${e.message}`); }
     else runLog.stopped = e.message;
   }
+  // 全レース自動記録: 締切前のレースはその時点の予想を記録(締切後は書き換えない)
+  try {
+    for (const d of [today]) for (const [jcd, vdoc] of Object.entries(venueDocs[d] || {})) {
+      if (recordAutoPredictions(vdoc, d, clock())) markDirty(d, jcd);
+    }
+  } catch (e) { runLog.errors.push(`予想の自動記録: ${e.message}`); }
   saveAll();
+  for (const d of [today, addDays(today, -1)]) {
+    if (dayDocs[d]) writeJson(path.join(store, d, 'autolog.json'), buildAutolog(d, venueDocs[d]));
+  }
   prune(store, today);
   return finish();
 }

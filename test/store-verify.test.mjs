@@ -68,3 +68,15 @@ test('外す/外さないの比較: 1号艇1着の結果は外さない側だけ
   assert.equal(c.off.j.hit, true);
   assert.ok(c.on.bets.every((b) => !b.combo.startsWith('1-')));
 });
+
+test('自動記録の集計', async () => {
+  const { summarizeAutolog } = await import('../app/js/verify.js');
+  const rows = [
+    { bets: { A_on: ['2-1-3', '3-1-2'] }, reflect: { exhibition: true }, result: { combo: '3-1-2', payout: 2000 } },
+    { bets: { A_on: ['2-1-3'] }, reflect: { exhibition: false }, result: { combo: '1-2-3', payout: 500 } },
+    { bets: { A_on: ['2-1-3'] }, result: null },
+    { bets: { A_on: null }, result: { combo: '1-2-3', payout: 500 } },
+  ];
+  const s = summarizeAutolog(rows, 'A_on');
+  assert.equal(s.races, 2); assert.equal(s.hits, 1); assert.equal(s.stake, 300); assert.equal(s.ret, 2000); assert.equal(s.exhibitionShare, 0.5);
+});
