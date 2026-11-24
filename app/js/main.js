@@ -365,6 +365,9 @@ async function viewStats() {
   setTab('stats');
   clearInterval(refreshTimer);
   const autoHtml = await autoCard();
+  // 成績は全レース自動記録の1つにまとめる(この端末で開いたレースの記録は保存は続けるが、紛らわしいので表示しない)
+  app.innerHTML = '<h1>成績</h1>' + autoHtml;
+  return;
   const all = allPredictions();
   if (!all.length) {
     app.innerHTML = '<h1>成績</h1>' + autoHtml + '<div class="card"><p>まだ保存した予想がありません。</p><p class="small muted">レースの画面を開くと、その時点の予想が自動で保存されます。結果が出ると自動で照合します。</p></div>';
