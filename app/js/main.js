@@ -336,9 +336,13 @@ async function viewStats() {
   const sumOf = (k) => summarize(cmp.map((x) => ({ rec: { ...x.rec, bets: x.c[k].bets }, j: x.c[k].j })));
   const sOn = sumOf('on'), sOff = sumOf('off');
   const cell = (j) => (j.state === 'done' ? (j.hit ? `<b class="pos">◯ ${j.ret.toLocaleString()}円</b>` : '×') : j.state === 'void' ? '中止' : '—');
-  const recent = cmp.sort((a, b) => (b.date + String(b.rno).padStart(2, '0') + b.jcd).localeCompare(a.date + String(a.rno).padStart(2, '0') + a.jcd)).slice(0, 60).map((x) =>
-    `<tr><td class="l"><a href="#/r/${x.date}/${x.jcd}/${x.rno}">${+x.date.slice(6)}日 ${esc(VENUE_NAME[x.jcd])}${x.rno}R</a></td>
-     <td>${x.j.state === 'done' ? combo(x.j.combo, true) : x.j.state === 'void' ? '中止' : '結果待ち'}</td><td>${cell(x.c.on.j)}</td><td>${cell(x.c.off.j)}</td></tr>`).join('');
+  const rowOf = (x) => `<tr><td class="l"><a href="#/r/${x.date}/${x.jcd}/${x.rno}">${+x.date.slice(6)}日 ${esc(VENUE_NAME[x.jcd])}${x.rno}R</a></td>
+     <td>${x.j.state === 'done' ? combo(x.j.combo, true) : x.j.state === 'void' ? '中止' : '結果待ち'}</td><td>${cell(x.c.on.j)}</td><td>${cell(x.c.off.j)}</td></tr>`;
+  const order = (a, b) => (b.date + String(b.rno).padStart(2, '0') + b.jcd).localeCompare(a.date + String(a.rno).padStart(2, '0') + a.jcd);
+  // 結果が出たレースは件数の上限なしで全部表示し、結果待ちは別にまとめる(過去の実績が隠れないように)
+  const doneRows = cmp.filter((x) => x.j.state !== 'waiting').sort(order).map(rowOf).join('');
+  const waitList = cmp.filter((x) => x.j.state === 'waiting').sort(order);
+  const recent = doneRows || '<tr><td colspan="4" class="muted">結果が出たレースはまだありません</td></tr>';
   const cmpCard = `<div class="card"><h2>1号艇1着を「外す」と「外さない」の比較</h2>
     <div class="tbl-wrap"><table class="t"><thead><tr><th></th><th>外す</th><th>外さない</th></tr></thead><tbody>
     <tr><td class="l">的中率</td><td><b>${pct(sOn.hitRate)}</b><br><span class="na">${sOn.hits}/${sOn.betRaces}</span></td><td><b>${pct(sOff.hitRate)}</b><br><span class="na">${sOff.hits}/${sOff.betRaces}</span></td></tr>
@@ -356,7 +360,8 @@ async function viewStats() {
       ${bucketRows ? `<div class="tbl-wrap"><table class="t"><thead><tr><th>予想確率の帯</th><th>件数</th><th>予想の平均</th><th>実際に出た割合</th></tr></thead><tbody>${bucketRows}</tbody></table></div>` : '<p class="muted">結果が出たレースがまだありません。</p>'}
       ${s.winTop.n ? `<p class="small">1着予想(一番確率が高い艇): 予想の平均 ${pct(s.winTop.avgP)} → 実際の的中 ${pct(s.winTop.rate)}(${s.winTop.n}レース)</p>` : ''}
       ${s.logLoss != null ? `<p class="small muted">対数損失 ${s.logLoss.toFixed(2)}(でたらめに120通りを均等に見た場合 ${s.uniformLogLoss.toFixed(2)}。小さいほど良い)</p>` : ''}</div>
-    <div class="card"><h2>レースごとの結果</h2><div class="tbl-wrap"><table class="t"><thead><tr><th class="l">レース</th><th>結果</th><th>外す</th><th>外さない</th></tr></thead><tbody>${recent}</tbody></table></div></div>`;
+    <div class="card"><h2>レースごとの結果(${cmp.length - waitList.length}件)</h2><div class="tbl-wrap"><table class="t"><thead><tr><th class="l">レース</th><th>結果</th><th>外す</th><th>外さない</th></tr></thead><tbody>${recent}</tbody></table></div>
+      ${waitList.length ? `<details><summary>結果待ち(${waitList.length}件)</summary><div class="tbl-wrap"><table class="t"><tbody>${waitList.map(rowOf).join('')}</tbody></table></div></details>` : ''}</div>`;
 }
 
 // ---------- 保存・情報 ----------
