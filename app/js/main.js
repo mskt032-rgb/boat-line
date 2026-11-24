@@ -354,12 +354,16 @@ function dayTable(rows) {
     <p class="small muted">上の段が的中率、下の段が回収率です。</p>`;
 }
 
-async function autoCard() {
+async function autoCard(sel) {
   const idx = await getJson('index.json');
   const dates = (idx?.dates || []).slice(0, 45);
   const logs = (await Promise.all(dates.map((d) => getJson(`${d}/autolog.json`)))).filter(Boolean);
-  const rows = logs.flatMap((l) => l.rows.map((r) => ({ ...r, date: l.date })));
-  if (!rows.length) return '<div class="card"><h2>全レース自動記録</h2><p class="small muted">まだ記録がありません。締切前のレースから順に、自動で記録していきます。</p></div>';
+  const allRows = logs.flatMap((l) => l.rows.map((r) => ({ ...r, date: l.date })));
+  const logDates = [...new Set(allRows.map((r) => r.date))].sort().reverse();
+  const today = jstDate();
+  const bar = `<div class="datebar"><a href="#/stats" class="${sel ? '' : 'on'}">全期間</a>${logDates.map((d) => `<a href="#/stats/${d}" class="${d === sel ? 'on' : ''}">${d === today ? '今日' : `${fmtDate(d)}(${wd(d)})`}</a>`).join('')}</div>`;
+  const rows = sel ? allRows.filter((r) => r.date === sel) : allRows;
+  if (!rows.length) return bar + '<div class="card"><h2>全レース自動記録</h2><p class="small muted">まだ記録がありません。締切前のレースから順に、自動で記録していきます。</p></div>';
   const line = (m) => {
     const on = summarizeAutolog(rows, `${m}_on`), off = summarizeAutolog(rows, `${m}_off`);
     const c = (x) => (x.races ? `<b>${pct(x.hitRate)}</b> <span class="na">${x.hits}/${x.races}</span><br>回収 <b>${pct(x.recovery, 0)}</b>` : '<span class="na">—</span>');
@@ -369,18 +373,18 @@ async function autoCard() {
   const cell = (r, k) => { const b = r.bets?.[k]; if (!b) return '<span class="na">—</span>'; if (!r.result?.combo) return '—'; return b.includes(r.result.combo) ? `<b class="pos">◯ ${(r.result.payout || 0).toLocaleString()}円</b>` : '×'; };
   const done = rows.filter((r) => r.result?.combo).sort((x, y) => (y.date + y.deadline).localeCompare(x.date + x.deadline));
   const list = done.map((r) => `<tr><td class="l"><a href="#/r/${r.date}/${r.jcd}/${r.rno}">${+r.date.slice(6)}日 ${esc(VENUE_NAME[r.jcd])}${r.rno}R</a>${r.reflect?.exhibition ? '' : '<br><span class="na">展示なし</span>'}</td><td>${combo(r.result.combo, true)}</td><td>${cell(r, 'A_on')}</td><td>${cell(r, 'A_off')}</td></tr>`).join('');
-  return `<div class="card"><h2>全レース自動記録(締切直前の予想)</h2>
+  return `${bar}<div class="card"><h2>${sel ? `${fmtDate(sel)}(${wd(sel)})の成績` : '全期間の成績'}(締切直前の予想)</h2>
     <p class="small">画面を開かなくても、全レースの締切直前の予想を自動で記録しています。展示入りの割合: ${pct(a.exhibitionShare, 0)}</p>
     <div class="tbl-wrap"><table class="t"><thead><tr><th class="l">モード</th><th>1号艇1着<br>なし</th><th>1号艇1着<br>あり</th></tr></thead><tbody>${line('A')}${line('B')}${line('C')}</tbody></table></div>
     <p class="small muted">各買い目100円。B・Cはオッズが取れたレースだけで集計。</p>
-    ${dayTable(rows)}
+    ${sel ? '' : dayTable(rows)}
     <details><summary>レースごとの結果(${done.length}件・モードA)</summary><div class="tbl-wrap"><table class="t"><thead><tr><th class="l">レース</th><th>結果</th><th>1号艇1着<br>なし</th><th>1号艇1着<br>あり</th></tr></thead><tbody>${list}</tbody></table></div></details></div>`;
 }
 
-async function viewStats() {
+async function viewStats(sel) {
   setTab('stats');
   clearInterval(refreshTimer);
-  const autoHtml = await autoCard();
+  const autoHtml = await autoCard(sel);
   // 成績は全レース自動記録の1つにまとめる(この端末で開いたレースの記録は保存は続けるが、紛らわしいので表示しない)
   app.innerHTML = '<h1>成績</h1>' + autoHtml;
   return;
@@ -491,7 +495,7 @@ function route() {
   window.scrollTo(0, 0);
   if (h[0] === 'v' && h[2]) return viewVenue(h[1], h[2]);
   if (h[0] === 'r' && h[3]) return viewRace(h[1], h[2], h[3]);
-  if (h[0] === 'stats') return viewStats();
+  if (h[0] === 'stats') return viewStats(/^\d{8}$/.test(h[1] || '') ? h[1] : null);
   if (h[0] === 'settings') return viewSettings();
   if (h[0] === 'd' && h[1]) return viewHome(h[1]);
   return viewHome(null);
