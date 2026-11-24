@@ -121,3 +121,15 @@ test('モードC: 20倍未満は選ばない', () => {
   assert.ok(r.bets.length > 0);
   assert.ok(r.bets.every((b) => b.odds >= 20));
 });
+
+test('締切時点の予想: 締切後に取得した直前情報・オッズは使わない', async () => {
+  const { raceAtDeadline } = await import('../app/js/predict.js');
+  const r = makeRace({ withBefore: true, odds: flatOdds(30) });
+  const dl = Date.parse('2026-11-23T01:30:00Z');
+  r.before.fetchedAt = '2026-11-23T01:20:00Z';
+  r.odds.fetchedAt = '2026-11-23T01:31:00Z';
+  const f = raceAtDeadline(r, dl);
+  assert.ok(f.before);
+  assert.equal(f.odds, null);
+  assert.deepEqual(predictRace(f).probs, predictRace({ ...r, odds: null }).probs);
+});

@@ -1,7 +1,7 @@
 // BOAT LINE 画面の組み立て
 import { VENUES, VENUE_NAME } from './venues.js';
 import { jstDate, deadlineMs, jstParts } from './time.js';
-import { predictRace, selectBets, MODES, KIMARITE_ORDER, rankCombos } from './predict.js';
+import { predictRace, selectBets, MODES, KIMARITE_ORDER, rankCombos, raceAtDeadline } from './predict.js';
 import { getPrefs, setPrefs, predictionsFor, savePredictionVersion, makeRecord, allPredictions, exportBackup, importBackup } from './store.js';
 import { finalVersion, judge, summarize, compareExclusion, summarizeAutolog } from './verify.js';
 
@@ -171,8 +171,11 @@ async function viewRace(date, jcd, rno, fresh) {
     autoRefresh((f) => viewRace(date, jcd, rno, f));
     return;
   }
-  const pred = predictRace(race);
-  const odds = race.odds?.status === 'ok' ? race.odds.data.odds : null;
+  // 締切後は締切時点のデータだけで計算する(締切後に予想を書き換えない)
+  const closed = dl != null && now >= dl;
+  const predRace = closed ? raceAtDeadline(race, dl) : race;
+  const pred = predictRace(predRace);
+  const odds = predRace.odds?.status === 'ok' ? predRace.odds.data.odds : null;
   const bets = selectBets(pred, odds, prefs);
   const result = race.result?.status === 'ok' ? race.result : null;
   const resCombo = result?.data?.trifecta?.combo;
@@ -182,7 +185,7 @@ async function viewRace(date, jcd, rno, fresh) {
   if (pred.ok && (dl == null || now < dl)) {
     const r = savePredictionVersion(makeRecord({ date, jcd, rno, deadline: race.deadline, pred, betsRes: bets, prefs, race }));
     saveMsg = r.error ? `<div class="note bad">${esc(r.error)}</div>` : `<p class="small muted">この予想は端末に自動保存しました(第${r.record.version}版 ${fmtTime(r.record.savedAt)})。データや設定が変わると新しい版として追加保存し、前の版は書き換えません。</p>`;
-  } else if (pred.ok) saveMsg = '<p class="small muted">締切後のため、新しい版は保存しません(後出しを防ぐため)。</p>';
+  } else if (pred.ok) saveMsg = '<p class="small muted">締切時点のデータで計算した予想です。締切後に取得したデータでは書き換えません。</p>';
   const lateData = pred.ok && dl && race.racelist?.fetchedAt && Date.parse(race.racelist.fetchedAt) >= dl;
 
   // 設定
@@ -273,7 +276,7 @@ function gradedCard(date, jcd, rno, dl, race, now) {
   if (fv) { const c = compareExclusion(fv, race.result); h += block('この端末で保存した予想(モードA)', `第${fv.version}版・締切前 ${fmtTime(fv.savedAt)} に保存${fv.reflect?.exhibition ? '(展示入り)' : '(展示なし)'}`, c.on.bets.map((b) => b.combo), c.off.bets.map((b) => b.combo)); }
   if (!h) return '';
   return `<div class="card"><h2>成績に使った予想${res ? ` — 結果 ${combo(res, true)}` : ''}</h2>${h}
-    <p class="small muted">下の「買い目」は、いまのデータ(締切時のオッズなど)で計算し直した参考です。成績には、ここに出ている締切前の予想を使っています。</p></div>`;
+    <p class="small muted">成績には、ここに出ている締切前に記録した予想を使っています。</p></div>`;
 }
 
 function detailTables(race) {

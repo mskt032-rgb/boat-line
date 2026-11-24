@@ -4,7 +4,7 @@ import { deadlineMs } from '../app/js/time.js';
 export const RULES = {
   indexRefreshMin: 120,     // 開催場一覧は2時間に1回まで見直す
   preWindowMin: 25,         // 締切25分前から直前情報・オッズを取得
-  preAfterMin: 2,           // 締切後2分までは取得対象
+  preAfterMin: 0,           // 締切後は直前情報・オッズを取らない(締切時点の予想を書き換えないため)
   preRefetchMin: 8,         // 同じレースの直前情報・オッズは8分以上あけて取り直す
   resultDelayMin: 8,        // 締切8分後から結果を取りにいく
   resultMaxAttempts: 8,     // 結果の取得を試す回数の上限
@@ -51,7 +51,7 @@ export function planTasks(days, now) {
           && toDl >= -RULES.pastListHours * 60 && olderThan(r.racelist?.attemptedAt, now, RULES.pastListRetryMin)) {
           pastLists.push({ type: 'racelist', date, jcd, rno, at: dl });
         }
-        if (toDl <= RULES.preWindowMin && toDl >= -RULES.preAfterMin && !v.canceled) {
+        if (toDl <= RULES.preWindowMin && toDl > -RULES.preAfterMin && !v.canceled) {
           if (olderThan(r.before?.attemptedAt, now, RULES.preRefetchMin)) pre.push({ type: 'beforeinfo', date, jcd, rno, at: dl });
           if (olderThan(r.odds?.attemptedAt, now, RULES.preRefetchMin)) pre.push({ type: 'odds3t', date, jcd, rno, at: dl });
         }

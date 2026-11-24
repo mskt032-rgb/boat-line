@@ -61,3 +61,9 @@ test('開催場一覧の見直し間隔', () => {
   assert.equal(needIndex({ index: { status: 'ok', fetchedAt: new Date(now - 30 * 60000).toISOString() } }, now), false);
   assert.equal(needIndex({ index: { status: 'ok', fetchedAt: new Date(now - 130 * 60000).toISOString() } }, now), true);
 });
+
+test('締切後は直前情報・オッズを取りにいかない', () => {
+  const races = { 1: { rno: 1, deadline: '10:30', racelist: { status: 'ok' } } };
+  const t = planTasks([{ date: D, venues: { '02': { races } } }], at('10:31'));
+  assert.ok(!t.some((x) => x.type === 'beforeinfo' || x.type === 'odds3t'));
+});

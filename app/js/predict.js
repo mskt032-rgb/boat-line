@@ -279,3 +279,10 @@ export function selectBets(pred, odds, opt = {}) {
   const evSum = bets.every((b) => b.ev != null) && bets.length ? bets.reduce((a, b) => a + b.ev, 0) / bets.length : null;
   return { bets, warnings, available: true, hitProb, avgEv: evSum };
 }
+
+/** 締切時点のデータだけを残したレース(締切後に取得した直前情報・オッズは使わない) */
+export function raceAtDeadline(race, deadlineMs) {
+  if (!race || deadlineMs == null) return race;
+  const before = (x) => (x?.fetchedAt && Date.parse(x.fetchedAt) < deadlineMs ? x : null);
+  return { ...race, before: before(race.before), odds: before(race.odds) };
+}
