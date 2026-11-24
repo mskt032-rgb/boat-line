@@ -24,7 +24,7 @@ jobs:
     timeout-minutes: 25
     environment:
       name: github-pages
-      url: ${{ steps.deploy.outputs.page_url }}
+      url: ${{ steps.deploy1.outputs.page_url || steps.deploy2.outputs.page_url || steps.deploy.outputs.page_url }}
     steps:
       - name: 開始時刻を記録
         run: echo "STARTED_AT=$(date +%s)" >> "$GITHUB_ENV"
@@ -61,7 +61,21 @@ jobs:
       - uses: actions/upload-pages-artifact@v3
         with:
           path: _site
+      - id: deploy1
+        continue-on-error: true
+        uses: actions/deploy-pages@v4
+      - name: 公開に失敗したら少し待つ
+        if: steps.deploy1.outcome == 'failure'
+        run: sleep 45
+      - id: deploy2
+        if: steps.deploy1.outcome == 'failure'
+        continue-on-error: true
+        uses: actions/deploy-pages@v4
+      - name: もう一度失敗したら少し待つ
+        if: steps.deploy1.outcome == 'failure' && steps.deploy2.outcome == 'failure'
+        run: sleep 90
       - id: deploy
+        if: steps.deploy1.outcome == 'failure' && steps.deploy2.outcome == 'failure'
         uses: actions/deploy-pages@v4
       - name: 次の実行を予約(日本時間6時〜22時50分)
         if: always()
