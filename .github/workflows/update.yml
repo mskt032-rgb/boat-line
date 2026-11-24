@@ -21,7 +21,7 @@ concurrency:
 jobs:
   update:
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 340
     environment:
       name: github-pages
       url: ${{ steps.deploy1.outputs.page_url || steps.deploy2.outputs.page_url || steps.deploy.outputs.page_url }}
@@ -77,14 +77,20 @@ jobs:
       - id: deploy
         if: steps.deploy1.outcome == 'failure' && steps.deploy2.outcome == 'failure'
         uses: actions/deploy-pages@v4
-      - name: 次の実行を予約(日本時間6時〜22時50分)
+      - name: 次の実行を予約(夜間は朝6時まで待つ)
         if: always()
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           now_min=$(( ( $(date -u +%s) / 60 + 9 * 60 ) % 1440 ))
-          if [ "$now_min" -lt 360 ] || [ "$now_min" -ge 1370 ]; then echo "時間外のため予約しません"; exit 0; fi
-          wait=$(( STARTED_AT + 600 - $(date +%s) ))
+          if [ "$now_min" -lt 360 ] || [ "$now_min" -ge 1370 ]; then
+            # 夜は取得しない。朝6時に確実に始めるため、6時まで(最長5時間20分)待ってから次を予約する
+            until6=$(( ( (360 - now_min + 1440) % 1440 ) * 60 ))
+            wait=$(( until6 < 19200 ? until6 : 19200 ))
+            echo "夜間のため ${wait} 秒待ってから次の実行を予約します"
+          else
+            wait=$(( STARTED_AT + 600 - $(date +%s) ))
+          fi
           if [ "$wait" -gt 0 ]; then sleep "$wait"; fi
           waiting=$(gh run list -R "$GITHUB_REPOSITORY" --workflow update.yml --limit 20 --json status --jq '[.[] | select(.status=="queued" or .status=="pending" or .status=="waiting" or .status=="requested")] | length')
           if [ "$waiting" -gt 0 ]; then echo "すでに次の実行が待っています"; exit 0; fi
