@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 const mem = new Map();
 globalThis.localStorage = { getItem: (k) => (mem.has(k) ? mem.get(k) : null), setItem: (k, v) => mem.set(k, String(v)), removeItem: (k) => mem.delete(k) };
 const { savePredictionVersion, makeRecord, predictionsFor, exportBackup, importBackup, getPrefs } = await import('../app/js/store.js');
-const { judge, summarize, finalVersion } = await import('../app/js/verify.js');
+const { judge, summarize, finalVersion, compareExclusion } = await import('../app/js/verify.js');
 const { predictRace, selectBets } = await import('../app/js/predict.js');
 const { makeRace, flatOdds } = await import('./helpers.mjs');
 
@@ -58,4 +58,13 @@ test('照合と集計: 的中率・回収率・確率の当たり具合', () => 
 test('最終版は締切前に保存された最後の版', () => {
   const vs = [{ version: 1, savedAt: '2026-11-23T01:00:00Z' }, { version: 2, savedAt: '2026-11-23T01:20:00Z' }, { version: 3, savedAt: '2026-11-23T01:40:00Z' }];
   assert.equal(finalVersion(vs, Date.parse('2026-11-23T01:30:00Z')).version, 2);
+});
+
+test('外す/外さないの比較: 1号艇1着の結果は外さない側だけ的中', () => {
+  const p = predictRace(makeRace({ nat: [8.5, 4, 4, 4, 4, 4] }));
+  const rec = makeRecord({ date: '20261124', jcd: '02', rno: 1, deadline: '10:30', pred: p, betsRes: selectBets(p, null, getPrefs()), prefs: getPrefs(), race: makeRace() });
+  const c = compareExclusion(rec, { status: 'ok', data: { trifecta: { combo: '1-2-3', payout: 500 } } });
+  assert.equal(c.on.j.hit, false);
+  assert.equal(c.off.j.hit, true);
+  assert.ok(c.on.bets.every((b) => !b.combo.startsWith('1-')));
 });

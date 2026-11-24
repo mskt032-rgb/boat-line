@@ -1,5 +1,5 @@
 // 保存した予想と確定結果の照合、的中率・回収率・確率の当たり具合
-import { ALL_COMBOS } from './predict.js';
+import { ALL_COMBOS, selectBets } from './predict.js';
 
 const BUCKETS = [[0, 0.01], [0.01, 0.03], [0.03, 0.06], [0.06, 0.1], [0.1, 0.2], [0.2, 1.01]];
 
@@ -72,4 +72,16 @@ export function summarize(items) {
     waiting: items.filter((x) => x.j.state === 'waiting').length,
     void: items.filter((x) => x.j.state === 'void').length,
   };
+}
+
+/** 保存した確率から「1号艇1着を外す/外さない」両方のモードA買い目を作り、結果と照合する */
+export function compareExclusion(rec, result) {
+  const probs = Object.fromEntries(ALL_COMBOS.map((k, i) => [k, rec.probs?.[i] ?? 0]));
+  const pred = { ok: true, probs, winProb: rec.winProb || {} };
+  const out = {};
+  for (const [key, ex] of [['on', true], ['off', false]]) {
+    const bets = selectBets(pred, null, { mode: 'A', excludeBoat1First: ex }).bets.map((b) => ({ combo: b.combo }));
+    out[key] = { bets, j: judge({ ...rec, bets }, result) };
+  }
+  return out;
 }

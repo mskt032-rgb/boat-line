@@ -3,7 +3,7 @@ import { VENUES, VENUE_NAME } from './venues.js';
 import { jstDate, deadlineMs, jstParts } from './time.js';
 import { predictRace, selectBets, MODES, KIMARITE_ORDER, rankCombos } from './predict.js';
 import { getPrefs, setPrefs, predictionsFor, savePredictionVersion, makeRecord, allPredictions, exportBackup, importBackup } from './store.js';
-import { finalVersion, judge, summarize } from './verify.js';
+import { finalVersion, judge, summarize, compareExclusion } from './verify.js';
 
 const app = document.getElementById('app');
 const DATA = './data';
@@ -331,10 +331,20 @@ async function viewStats() {
   const s = summarize(items);
   const byMode = ['A', 'B', 'C'].map((m) => ({ m, s: summarize(items.filter((x) => x.rec.mode === m)) })).filter((x) => x.s.races + x.s.waiting > 0);
   const bucketRows = s.buckets.filter((b) => b.n).map((b) => `<tr><td>${pct(b.lo, 0)}〜${b.hi > 1 ? '' : pct(b.hi, 0)}</td><td>${b.n}</td><td>${pct(b.avgP, 2)}</td><td>${pct(b.rate, 2)}</td></tr>`).join('');
-  const recent = items.sort((a, b) => (b.date + String(b.rno).padStart(2, '0')).localeCompare(a.date + String(a.rno).padStart(2, '0'))).slice(0, 40).map((x) =>
-    `<tr><td class="l"><a href="#/r/${x.date}/${x.jcd}/${x.rno}">${fmtDate(x.date)} ${esc(VENUE_NAME[x.jcd])}${x.rno}R</a></td><td>${x.rec.mode}・${x.rec.bets.length}点</td>
-     <td>${x.j.state === 'done' ? `${combo(x.j.combo, true)}` : x.j.state === 'void' ? '中止' : '結果待ち'}</td><td>${x.j.state === 'done' ? (x.j.hit ? `<b class="pos">${x.j.ret.toLocaleString()}円</b>` : '外れ') : ''}</td></tr>`).join('');
-  app.innerHTML = `<h1>成績</h1>
+  // 1号艇1着を「外す」「外さない」の比較(モードAで計算し直す)
+  const cmp = items.map((x) => ({ ...x, c: compareExclusion(x.rec, docs.get(`${x.date}/${x.jcd}`)?.races?.[x.rno]?.result) }));
+  const sumOf = (k) => summarize(cmp.map((x) => ({ rec: { ...x.rec, bets: x.c[k].bets }, j: x.c[k].j })));
+  const sOn = sumOf('on'), sOff = sumOf('off');
+  const cell = (j) => (j.state === 'done' ? (j.hit ? `<b class="pos">◯ ${j.ret.toLocaleString()}円</b>` : '×') : j.state === 'void' ? '中止' : '—');
+  const recent = cmp.sort((a, b) => (b.date + String(b.rno).padStart(2, '0') + b.jcd).localeCompare(a.date + String(a.rno).padStart(2, '0') + a.jcd)).slice(0, 60).map((x) =>
+    `<tr><td class="l"><a href="#/r/${x.date}/${x.jcd}/${x.rno}">${+x.date.slice(6)}日 ${esc(VENUE_NAME[x.jcd])}${x.rno}R</a></td>
+     <td>${x.j.state === 'done' ? combo(x.j.combo, true) : x.j.state === 'void' ? '中止' : '結果待ち'}</td><td>${cell(x.c.on.j)}</td><td>${cell(x.c.off.j)}</td></tr>`).join('');
+  const cmpCard = `<div class="card"><h2>1号艇1着を「外す」と「外さない」の比較</h2>
+    <div class="tbl-wrap"><table class="t"><thead><tr><th></th><th>外す</th><th>外さない</th></tr></thead><tbody>
+    <tr><td class="l">的中率</td><td><b>${pct(sOn.hitRate)}</b><br><span class="na">${sOn.hits}/${sOn.betRaces}</span></td><td><b>${pct(sOff.hitRate)}</b><br><span class="na">${sOff.hits}/${sOff.betRaces}</span></td></tr>
+    <tr><td class="l">回収率</td><td><b>${pct(sOn.recovery, 0)}</b><br><span class="na">${sOn.ret.toLocaleString()}/${sOn.stake.toLocaleString()}円</span></td><td><b>${pct(sOff.recovery, 0)}</b><br><span class="na">${sOff.ret.toLocaleString()}/${sOff.stake.toLocaleString()}円</span></td></tr>
+    </tbody></table></div><p class="small muted">締切前に保存した最終版の確率から、モードA(的中重視)で両方の買い目を作り直して比べています。各買い目100円。</p></div>`;
+  app.innerHTML = `<h1>成績</h1>${cmpCard}
     <div class="card"><h2>全体(締切前の最終版で集計)</h2>
       <div class="stat"><div><b>${pct(s.hitRate)}</b><span>的中率<br>${s.hits}/${s.betRaces}レース</span></div>
       <div><b class="${s.recovery >= 1 ? 'pos' : ''}">${pct(s.recovery, 0)}</b><span>回収率<br>${s.ret.toLocaleString()}/${s.stake.toLocaleString()}円</span></div>
@@ -346,7 +356,7 @@ async function viewStats() {
       ${bucketRows ? `<div class="tbl-wrap"><table class="t"><thead><tr><th>予想確率の帯</th><th>件数</th><th>予想の平均</th><th>実際に出た割合</th></tr></thead><tbody>${bucketRows}</tbody></table></div>` : '<p class="muted">結果が出たレースがまだありません。</p>'}
       ${s.winTop.n ? `<p class="small">1着予想(一番確率が高い艇): 予想の平均 ${pct(s.winTop.avgP)} → 実際の的中 ${pct(s.winTop.rate)}(${s.winTop.n}レース)</p>` : ''}
       ${s.logLoss != null ? `<p class="small muted">対数損失 ${s.logLoss.toFixed(2)}(でたらめに120通りを均等に見た場合 ${s.uniformLogLoss.toFixed(2)}。小さいほど良い)</p>` : ''}</div>
-    <div class="card"><h2>最近の予想</h2><div class="tbl-wrap"><table class="t"><tbody>${recent}</tbody></table></div></div>`;
+    <div class="card"><h2>レースごとの結果</h2><div class="tbl-wrap"><table class="t"><thead><tr><th class="l">レース</th><th>結果</th><th>外す</th><th>外さない</th></tr></thead><tbody>${recent}</tbody></table></div></div>`;
 }
 
 // ---------- 保存・情報 ----------
