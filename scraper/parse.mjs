@@ -89,6 +89,28 @@ function raceMeta($) {
   };
 }
 
+/** 今節成績(出走表の右側: 1段目=R番号、2段目=進入コース、3段目=ST、4段目=着順) */
+export function parseKonsetsu($, tb) {
+  const trs = $(tb).find('tr');
+  const cellText = (td) => norm($(td).text());
+  const row0 = trs.eq(0).children('td').slice(8).map((_, td) => cellText(td)).get();
+  const rows = [1, 2, 3].map((i) => trs.eq(i).children('td').map((_, td) => cellText(td)).get());
+  const n = rows[0].length;
+  const races = [];
+  for (let i = 0; i < n; i++) {
+    const r = row0[i], course = rows[0][i], st = rows[1][i], rank = rows[2][i];
+    if (!rank) continue;
+    races.push({
+      r: /^\d+$/.test(r || '') ? +r : null,
+      course: /^[1-6]$/.test(course || '') ? +course : null,
+      st: (() => { const m = (st || '').match(/^(F)?0?\.(\d{2})$/); return m ? (m[1] ? -1 : 1) * parseFloat('0.' + m[2]) : null; })(),
+      rank: /^[1-6]$/.test(rank) ? +rank : null,
+      rankText: rank,
+    });
+  }
+  return { kon: races, konRaw: [row0.slice(0, n + 1), ...rows] };
+}
+
 /** 出走表 */
 export function parseRacelist(html) {
   const $ = cheerio.load(html);
@@ -127,6 +149,7 @@ export function parseRacelist(html) {
       motorNo: mot[0] ?? null, motor2: mot[1] ?? null, motor3: mot[2] ?? null,
       boatNo: bt[0] ?? null, boat2: bt[1] ?? null, boat3: bt[2] ?? null,
       absent: /欠場/.test(norm($(tb).text())),
+      ...parseKonsetsu($, tb),
     };
     for (const k of ['natWin', 'locWin']) if (e[k] != null && (e[k] < 0 || e[k] > 11)) { warnings.push(`${boat}号艇の${k}が範囲外(${e[k]})のため不採用`); e[k] = null; }
     for (const k of ['nat2', 'loc2', 'motor2', 'boat2']) if (e[k] != null && (e[k] < 0 || e[k] > 100)) { warnings.push(`${boat}号艇の${k}が範囲外のため不採用`); e[k] = null; }
@@ -287,4 +310,30 @@ export function parseResult(html) {
   const ready = order.length > 0 && !!trifecta;
   if (!ready && !canceled) warnings.push('結果はまだ発表されていません');
   return { ready, canceled, order, trifecta, kimarite, start, refunds: [...new Set(refunds)], warnings };
+}
+
+/** 選手のコース別成績ページ。見出しの文字で列を探し、1〜6コースの行を読む(読めない値は null) */
+export function parseRacerCourse(html) {
+  const $ = cheerio.load(html);
+  const warnings = [];
+  const courses = {};
+  let headers = null;
+  $('table').each((_, t) => {
+    const head = $(t).find('thead th, thead td').map((_, c) => norm($(c).text())).get();
+    if (!head.some((h) => /連対率|1着率|勝率/.test(h))) return;
+    $(t).find('tbody tr').each((_, tr) => {
+      const cells = $(tr).children('th,td').map((_, c) => norm($(c).text())).get();
+      const m = (cells[0] || '').match(/^([1-6])(?:コース)?$/);
+      if (!m) return;
+      const nums = cells.map((c) => { const x = c.match(/-?\d+(?:\.\d+)?/); return x ? parseFloat(x[0]) : null; });
+      const pick = (re) => { const i = head.findIndex((h) => re.test(h)); return i >= 0 ? nums[i] ?? null : null; };
+      courses[m[1]] = {
+        starts: pick(/出走/), win: pick(/1着率|勝率/), ren2: pick(/2連対率|2連率/), ren3: pick(/3連対率|3連率/),
+        st: pick(/平均ST|ST/), raw: cells,
+      };
+    });
+    if (Object.keys(courses).length) headers = head;
+  });
+  if (!Object.keys(courses).length) warnings.push('コース別成績の表が見つかりませんでした');
+  return { courses, headers, warnings };
 }

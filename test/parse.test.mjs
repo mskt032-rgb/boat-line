@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { cleanDayLabel, parseIndex, parseRacelist, parseBeforeinfo, parseOdds3t, parseResult, combosForFirst, norm } from '../scraper/parse.mjs';
-import { indexHtml, racelistHtml, beforeinfoHtml, oddsHtml, resultHtml } from './fixtures/html.mjs';
+import { parseRacerCourse, cleanDayLabel, parseIndex, parseRacelist, parseBeforeinfo, parseOdds3t, parseResult, combosForFirst, norm } from '../scraper/parse.mjs';
+import { racerCourseHtml, indexHtml, racelistHtml, beforeinfoHtml, oddsHtml, resultHtml } from './fixtures/html.mjs';
 
 test('全角数字・全角空白をそろえる', () => {
   assert.equal(norm('１２：３０　テスト'), '12:30 テスト');
@@ -119,4 +119,17 @@ test('開催日数の表記の修正', () => {
   assert.equal(cleanDayLabel('3日目'), '3日目');
   assert.equal(cleanDayLabel('初日'), '初日');
   assert.equal(cleanDayLabel(null), null);
+});
+
+test('今節成績: R・進入・ST・着順', () => {
+  const e = parseRacelist(racelistHtml()).entries[2];
+  assert.deepEqual(e.kon.map((k) => [k.r, k.course, k.st, k.rank]), [[3, 3, 0.15, 3], [9, 4, -0.02, 1]]);
+});
+
+test('コース別成績のページ', () => {
+  const r = parseRacerCourse(racerCourseHtml());
+  assert.equal(Object.keys(r.courses).length, 6);
+  assert.equal(r.courses['1'].win, 51);
+  assert.equal(r.courses['6'].ren3, 38);
+  assert.equal(r.courses['2'].starts, 18);
 });

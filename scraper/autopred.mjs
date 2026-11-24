@@ -5,15 +5,17 @@ import { deadlineMs } from '../app/js/time.js';
 
 const MODES = ['A', 'B', 'C'];
 
-export function recordAutoPredictions(vdoc, date, nowMs) {
+export function recordAutoPredictions(vdoc, date, nowMs, getRacer = () => null) {
   let changed = false;
   for (const race of Object.values(vdoc.races || {})) {
     const dl = deadlineMs(date, race.deadline);
     if (dl == null || nowMs >= dl) continue;
     if (race.racelist?.status !== 'ok') continue;
-    const stamp = JSON.stringify([race.racelist?.fetchedAt, race.before?.fetchedAt, race.odds?.fetchedAt]);
+    const racers = {};
+    for (const e of race.racelist.data.entries || []) { const r = e.regNo ? getRacer(e.regNo) : null; if (r?.status === 'ok') racers[e.boat] = r; }
+    const stamp = JSON.stringify([race.racelist?.fetchedAt, race.before?.fetchedAt, race.odds?.fetchedAt, Object.keys(racers).length]);
     if (race.auto?.stamp === stamp) continue;
-    const pred = predictRace(race);
+    const pred = predictRace(race, { racers });
     if (!pred.ok) continue;
     const odds = race.odds?.status === 'ok' ? race.odds.data.odds : null;
     const bets = {};
@@ -23,7 +25,7 @@ export function recordAutoPredictions(vdoc, date, nowMs) {
     }
     race.auto = {
       savedAt: new Date(nowMs).toISOString(), stamp, modelVersion: pred.modelVersion,
-      reflect: { exhibition: pred.reflect.exhibition, course: pred.reflect.course, odds: pred.reflect.odds },
+      reflect: { exhibition: pred.reflect.exhibition, course: pred.reflect.course, odds: pred.reflect.odds, konsetsu: pred.reflect.konsetsu, courseStats: pred.reflect.courseStats },
       probs: ALL_COMBOS.map((c) => Math.round(pred.probs[c] * 1e6) / 1e6),
       winProb: pred.winProb, bets,
     };

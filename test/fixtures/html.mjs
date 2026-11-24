@@ -24,7 +24,8 @@ export function racelistHtml(opts = {}) {
     <td rowspan="4">${nat[i]}<br>4${n}.00<br>6${n}.00</td>
     <td rowspan="4">${i === 5 ? '0.00' : '6.00'}<br>40.00<br>55.00</td>
     <td rowspan="4">${10 + n}<br>${30 + n * 2}.50<br>50.00</td>
-    <td rowspan="4">${20 + n}<br>35.00<br>50.00</td><td>1</td></tr><tr><td>x</td></tr><tr><td>x</td></tr><tr><td>x</td></tr></tbody>`).join('');
+    <td rowspan="4">${20 + n}<br>35.00<br>50.00</td><td>3</td><td>9</td><td></td><td rowspan="4">早見</td></tr>
+    <tr><td class="is-boatColor${n}">${n}</td><td>4</td><td></td></tr><tr><td>.15</td><td>F.02</td><td></td></tr><tr><td>${'０１２３４５６'[n]}</td><td>１</td><td></td></tr></tbody>`).join('');
   return `<html><body><h3 class="title16_titleDetail__add2020">予選　　　1800m</h3>${deadlinesRow(TIMES)}
     <div class="table1 is-tableFixed__3rdadmin"><table><thead><tr><th>枠</th></tr></thead>${body}</table></div></body></html>`;
 }
@@ -70,4 +71,9 @@ export function resultHtml({ order = [3, 1, 4, 2, 5, 6], payout = '¥12,340', ca
     <tr><td rowspan="2">3連単</td><td><div class="numberSet1"><span class="numberSet1_number is-type${order[0]}">${order[0]}</span><span>-</span><span class="numberSet1_number">${order[1]}</span><span>-</span><span class="numberSet1_number">${order[2]}</span></div></td><td><span class="is-payout1">${payout}</span></td><td>35</td></tr>
     <tr><td>2連単</td><td>x</td></tr></tbody></table></div>
     <div class="table1"><table><thead><tr><th>決まり手</th></tr></thead><tbody><tr><td>まくり</td></tr></tbody></table></div></body></html>`;
+}
+
+export function racerCourseHtml() {
+  const rows = [1, 2, 3, 4, 5, 6].map((c) => `<tr><th>${c}コース</th><td>${20 - c}</td><td>${(60 - c * 9).toFixed(1)}%</td><td>${(70 - c * 8).toFixed(1)}%</td><td>${(80 - c * 7).toFixed(1)}%</td><td>0.1${c}</td></tr>`).join('');
+  return `<html><body><table><thead><tr><th>コース</th><th>出走数</th><th>1着率</th><th>2連対率</th><th>3連対率</th><th>平均ST</th></tr></thead><tbody>${rows}</tbody></table></body></html>`;
 }

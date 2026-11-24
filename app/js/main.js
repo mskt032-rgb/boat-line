@@ -174,7 +174,11 @@ async function viewRace(date, jcd, rno, fresh) {
   // 締切後は締切時点のデータだけで計算する(締切後に予想を書き換えない)
   const closed = dl != null && now >= dl;
   const predRace = closed ? raceAtDeadline(race, dl) : race;
-  const pred = predictRace(predRace);
+  const regs = (race.racelist?.data?.entries || []).filter((e) => e.regNo);
+  const racerDocs = await Promise.all(regs.map((e) => getJson(`racers/${e.regNo}.json`)));
+  const racers = {};
+  regs.forEach((e, i) => { if (racerDocs[i]?.status === 'ok') racers[e.boat] = racerDocs[i]; });
+  const pred = predictRace(predRace, { racers });
   const odds = predRace.odds?.status === 'ok' ? predRace.odds.data.odds : null;
   const bets = selectBets(pred, odds, prefs);
   const result = race.result?.status === 'ok' ? race.result : null;
@@ -221,7 +225,7 @@ async function viewRace(date, jcd, rno, fresh) {
       <p class="small muted">進入(コース): ${pred.courseSource === 'exhibition' ? '展示の進入どおり' : '枠なりと仮定'} — ${[1, 2, 3, 4, 5, 6].filter((n) => pred.courseOf[n]).sort((a, b) => pred.courseOf[a] - pred.courseOf[b]).map((n) => bn(n, true)).join(' ')}</p></div>`;
 
     // 根拠
-    const groups = ['能力', 'モーター', '展示', 'ST'];
+    const groups = ['能力', 'コース', 'モーター', '展示', 'ST'];
     const evalRows = pred.evals.filter((e) => e.present).map((e) => `<tr><td>${bn(e.boat, true)}</td><td class="l">${esc(e.name || '')}<br><span class="na">${esc(e.cls || '')}</span></td>
       ${groups.map((g) => { const x = e.byGroup[g]; return `<td class="${x > 0.15 ? 'pos' : x < -0.15 ? 'neg' : ''}">${x == null ? '<span class="na">—</span>' : (x > 0 ? '+' : '') + x.toFixed(2)}</td>`; }).join('')}
       <td><b>${(e.score > 0 ? '+' : '') + e.score.toFixed(2)}</b></td></tr>`).join('');
@@ -234,10 +238,12 @@ async function viewRace(date, jcd, rno, fresh) {
     }
     for (const n of [5, 6]) { const e = pred.evals.find((x) => x.boat === n); if (e?.present) reasons.push(`${n}号艇: 1着 ${pct(pred.winProb[n])}、総合評価 ${(e.score > 0 ? '+' : '') + e.score.toFixed(2)}。`); }
     html += `<div class="card"><h2>予想の根拠</h2><ul class="plain">${reasons.map((r) => `<li>${r}</li>`).join('')}</ul>
-      <div class="tbl-wrap"><table class="t"><thead><tr><th>艇</th><th class="l">選手</th><th>能力</th><th>モーター</th><th>展示</th><th>ST</th><th>合計</th></tr></thead><tbody>${evalRows}</tbody></table></div>
+      <div class="tbl-wrap"><table class="t"><thead><tr><th>艇</th><th class="l">選手</th><th>能力</th><th>コース</th><th>モーター</th><th>展示</th><th>ST</th><th>合計</th></tr></thead><tbody>${evalRows}</tbody></table></div>
       <p class="small muted">数字は6艇の中での比較(0が平均、プラスが良い)。「—」は値が取れていないため評価に入れていない項目です。</p>
       <h3>データの反映状況</h3><ul class="plain">
         <li>出走表(能力・モーター・平均ST): ${reflectText(true)}</li>
+        <li>今節の成績: ${reflectText(pred.reflect.konsetsu)}</li>
+        <li>選手のコース別成績: ${reflectText(pred.reflect.courseStats)}</li>
         <li>展示タイム: ${reflectText(pred.reflect.exhibition)}</li>
         <li>スタート展示(ST・進入): ${reflectText(pred.reflect.exST)}${pred.reflect.course ? '' : '(進入は枠なり仮定)'}</li>
         <li>気象(風速・波高): ${reflectText(pred.reflect.weather)}</li>

@@ -5,7 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { runOnce } from '../scraper/run.mjs';
 import { deadlineMs } from '../app/js/time.js';
-import { indexHtml, racelistHtml, beforeinfoHtml, oddsHtml, resultHtml } from './fixtures/html.mjs';
+import { indexHtml, racelistHtml, beforeinfoHtml, oddsHtml, resultHtml, racerCourseHtml } from './fixtures/html.mjs';
 
 const D = '20261123';
 function fakeSite({ robots = 'User-agent: *\nDisallow:\n', failRacelist = null, status = {} } = {}) {
@@ -24,6 +24,7 @@ function fakeSite({ robots = 'User-agent: *\nDisallow:\n', failRacelist = null, 
     if (u.pathname.endsWith('/beforeinfo')) return { status: 200, text: beforeinfoHtml() };
     if (u.pathname.endsWith('/odds3t')) return { status: 200, text: oddsHtml() };
     if (u.pathname.endsWith('/raceresult')) return { status: 200, text: resultHtml() };
+    if (u.pathname.endsWith('/racersearch/course')) return { status: 200, text: racerCourseHtml() };
     return { status: 404, text: '' };
   };
   return { fetchText, calls };
@@ -48,7 +49,7 @@ test('朝: 開催場一覧→各場の出走表を取得して保存', async () 
   assert.equal(v.races[5].racelist.data.entries.length, 6);
   assert.match(v.races[5].racelist.source, /^https:\/\/www\.boatrace\.jp\/owpc\/pc\/race\/racelist\?rno=5&jcd=02&hd=20261123$/);
   assert.ok(v.races[5].racelist.fetchedAt);
-  assert.equal(log.requests, 1 + 1 + 24);
+  assert.equal(log.requests, 1 + 1 + 24 + log.racers);
   assert.deepEqual(read(store, 'index.json').dates, [D]);
   assert.equal(read(store, 'meta/log.json').length, 1);
 });
@@ -177,4 +178,18 @@ test('展示の見張り: 締切15分前を過ぎて展示が未発表なら、�
   assert.equal(v.races[1].before.status, 'ok');
   assert.equal(v.races[1].auto.reflect.exhibition, true);
   assert.ok(Date.parse(v.races[1].auto.savedAt) < deadlineMs(D, '10:30'));
+});
+
+test('選手のコース別成績を取得して保存し、自動記録の予想に入れる', async () => {
+  const store = tmp();
+  const site = fakeSite();
+  const log = await runOnce(opts(store, site, deadlineMs(D, '07:00')));
+  assert.ok(log.racers > 0);
+  const r = read(store, 'racers/4001.json');
+  assert.equal(r.status, 'ok');
+  assert.equal(r.courses['1'].ren3, 73);
+  await runOnce(opts(store, site, deadlineMs(D, '07:05')));
+  const v = read(store, `${D}/02.json`);
+  assert.equal(v.races[2].auto.reflect.courseStats, true);
+  assert.equal(v.races[2].auto.reflect.konsetsu, true);
 });

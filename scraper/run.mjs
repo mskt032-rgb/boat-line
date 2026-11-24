@@ -4,7 +4,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { cleanDayLabel, parseIndex, parseRacelist, parseBeforeinfo, parseOdds3t, parseResult } from './parse.mjs';
+import { parseRacerCourse, cleanDayLabel, parseIndex, parseRacelist, parseBeforeinfo, parseOdds3t, parseResult } from './parse.mjs';
 import { parseRobots, robotsFor } from './robots.mjs';
 import { planTasks, needIndex } from './plan.mjs';
 import { jstDate, addDays, isoNow, deadlineMs } from '../app/js/time.js';
@@ -21,6 +21,7 @@ const PATHS = {
   beforeinfo: (d, j, r) => `/owpc/pc/race/beforeinfo?rno=${r}&jcd=${j}&hd=${d}`,
   odds3t: (d, j, r) => `/owpc/pc/race/odds3t?rno=${r}&jcd=${j}&hd=${d}`,
   raceresult: (d, j, r) => `/owpc/pc/race/raceresult?rno=${r}&jcd=${j}&hd=${d}`,
+  racerCourse: (toban) => `/owpc/pc/data/racersearch/course?toban=${toban}`,
 };
 const SLOT = { racelist: 'racelist', beforeinfo: 'before', odds3t: 'odds', raceresult: 'result' };
 
@@ -209,6 +210,40 @@ export async function runOnce({
       }
     }
     runLog.planned = planned;
+
+    // 選手のコース別成績(1人30日に1回まで。1回の実行で最大20人。締切が近いレースの選手から)
+    const racerDir = path.join(store, 'racers');
+    const want = [];
+    for (const [jcd, vdoc] of Object.entries(venueDocs[today] || {})) {
+      for (const race of Object.values(vdoc.races || {})) {
+        const dl = deadlineMs(today, race.deadline);
+        if (dl == null || dl < now) continue;
+        for (const e of race.racelist?.data?.entries || []) if (e.regNo) want.push({ toban: e.regNo, dl });
+      }
+    }
+    want.sort((a, b) => a.dl - b.dl);
+    const seen = new Set();
+    let racerFetched = 0;
+    for (const { toban } of want) {
+      if (seen.has(toban) || racerFetched >= 20) continue;
+      seen.add(toban);
+      const file = path.join(racerDir, `${toban}.json`);
+      const prev = readJson(file, null);
+      const fresh = prev && clock() - Date.parse(prev.attemptedAt || 0) < (prev.status === 'ok' ? 30 : 3) * 86400000;
+      if (fresh) continue;
+      const p = PATHS.racerCourse(toban);
+      const rec = { toban, attemptedAt: isoNow(clock()), source: BASE + p };
+      try {
+        const r = parseRacerCourse(await get(p));
+        Object.assign(rec, Object.keys(r.courses).length ? { status: 'ok', fetchedAt: isoNow(clock()), courses: r.courses, headers: r.headers } : { status: 'empty', warnings: r.warnings });
+      } catch (e) {
+        if (e instanceof StopRun) throw e;
+        Object.assign(rec, { status: 'error', error: e.message });
+      }
+      writeJson(file, { ...(prev?.status === 'ok' && rec.status !== 'ok' ? prev : {}), ...rec });
+      racerFetched++;
+    }
+    runLog.racers = racerFetched;
   } catch (e) {
     if (!(e instanceof StopRun)) { runLog.errors.push(`予期しないエラー: ${e.message}`); }
     else runLog.stopped = e.message;
@@ -216,7 +251,7 @@ export async function runOnce({
   // 全レース自動記録: 締切前のレースはその時点の予想を記録(締切後は書き換えない)
   try {
     for (const d of [today]) for (const [jcd, vdoc] of Object.entries(venueDocs[d] || {})) {
-      if (recordAutoPredictions(vdoc, d, clock())) markDirty(d, jcd);
+      if (recordAutoPredictions(vdoc, d, clock(), (t) => readJson(path.join(store, 'racers', `${t}.json`), null))) markDirty(d, jcd);
     }
   } catch (e) { runLog.errors.push(`予想の自動記録: ${e.message}`); }
   saveAll();
@@ -260,7 +295,7 @@ export async function runOnce({
             if (e instanceof StopRun) throw e;
             rec.error = e.message; race.before = rec;
           }
-          if (recordAutoPredictions(vdoc, today, clock())) markDirty(today, jcd);
+          if (recordAutoPredictions(vdoc, today, clock(), (t) => readJson(path.join(store, 'racers', `${t}.json`), null))) markDirty(today, jcd);
           markDirty(today, jcd);
         }
         saveAll();

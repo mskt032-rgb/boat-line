@@ -3,7 +3,7 @@
 // 2) 進入後のコース並びから「逃げ・差し・まくり・まくり差し・抜きほか」の展開確率を出す
 // 3) 展開ごとに2着・3着の出やすさを掛け合わせ、3連単120通りの確率(合計100%)を出す
 
-export const MODEL_VERSION = '1.1';
+export const MODEL_VERSION = '1.2';
 
 /** 全120通り(1着→2着→3着の昇順) */
 export const ALL_COMBOS = (() => {
@@ -30,6 +30,9 @@ const FACTORS = [
   { key: 'natWin', label: '全国勝率', group: '能力', w: 1.0, better: 'high', floor: 0.5 },
   { key: 'locWin', label: '当地勝率', group: '能力', w: 0.25, better: 'high', floor: 0.6 },
   { key: 'clsPt', label: '級別', group: '能力', w: 0.25, better: 'high', floor: 0.4 },
+  { key: 'konRank', label: '今節の平均着順', group: '能力', w: 0.35, better: 'low', floor: 0.6 },
+  { key: 'courseWinR', label: 'そのコースでの1着率', group: 'コース', w: 0.3, better: 'high', floor: 0.3 },
+  { key: 'courseRen3R', label: 'そのコースでの3連対率', group: 'コース', w: 0.3, better: 'high', floor: 0.15 },
   { key: 'motor2', label: 'モーター2連率', group: 'モーター', w: 0.4, better: 'high', floor: 6 },
   { key: 'boat2', label: 'ボート2連率', group: 'モーター', w: 0.1, better: 'high', floor: 6 },
   { key: 'exTime', label: '展示タイム', group: '展示', w: 0.45, better: 'low', floor: 0.04 },
@@ -38,11 +41,13 @@ const FACTORS = [
   { key: 'fPenalty', label: 'フライング持ち', group: 'ST', w: 0.3, better: 'high', floor: 0.5 },
 ];
 const CLASS_PT = { A1: 1, A2: 0.5, B1: 0, B2: -0.6 };
+// コースごとの目安(全国の長期傾向)。選手のコース別成績をこれで割って「そのコースとしては良いか」を見る
+const COURSE_REN3_PRIOR = [0.74, 0.54, 0.52, 0.47, 0.36, 0.24];
 
 const isNum = (x) => typeof x === 'number' && Number.isFinite(x);
 
 /** 取得済みデータから各艇の素の値を集める(取れていない値は null) */
-export function collectInputs(race) {
+export function collectInputs(race, racers = {}) {
   const entries = race?.racelist?.data?.entries || [];
   const before = race?.before?.status === 'ok' ? race.before.data : null;
   const exByBoat = Object.fromEntries((before?.boats || []).map((b) => [b.boat, b]));
@@ -52,6 +57,10 @@ export function collectInputs(race) {
     const e = entries.find((x) => x.boat === n);
     const ex = exByBoat[n];
     const st = stByBoat[n];
+    const kon = (e?.kon || []).filter((k) => k.rank != null);
+    const course = st?.course ?? n; // 展示の進入が無ければ枠なり
+    const cs = racers?.[n]?.courses?.[course];
+    const pct = (x) => (isNum(x) ? (x > 1 ? x / 100 : x) : null);
     boats.push({
       boat: n,
       present: !!e && !e.absent,
@@ -66,6 +75,10 @@ export function collectInputs(race) {
       avgST: isNum(e?.avgST) && e.avgST > 0 ? e.avgST : null,
       exST: isNum(st?.st) ? Math.max(st.st, 0) : null, // 展示のフライングは「速すぎ」ではなく0.00として扱う
       fPenalty: isNum(e?.F) ? -e.F : null,
+      konRank: kon.length ? kon.reduce((a, k) => a + k.rank, 0) / kon.length : null,
+      konN: kon.length,
+      courseWinR: isNum(pct(cs?.win)) && (cs?.starts ?? 1) > 0 ? pct(cs.win) / COURSE_WIN_PRIOR[course - 1] : null,
+      courseRen3R: isNum(pct(cs?.ren3)) && (cs?.starts ?? 1) > 0 ? pct(cs.ren3) / COURSE_REN3_PRIOR[course - 1] : null,
       F: e?.F ?? null,
       course: st?.course ?? null,
     });
@@ -122,7 +135,7 @@ function stOf(e) { return isNum(e?.exST) ? e.exST : isNum(e?.avgST) ? e.avgST : 
  * 返り値: probs(120通り), winProb(艇別1着率), scenarios(展開確率), evals(艇別評価), notes(反映状況)
  */
 export function predictRace(race, opts = {}) {
-  const inputs = collectInputs(race);
+  const inputs = collectInputs(race, opts.racers || {});
   const notes = [];
   if (!inputs.hasEntries) return { ok: false, reason: '出走表がまだ取得できていないため、予想できません。', inputs };
   const { evals, used, missing } = evaluateBoats(inputs);
@@ -219,6 +232,8 @@ export function predictRace(race, opts = {}) {
     course: courseSource === 'exhibition',
     weather: !!(w && (isNum(w.windSpeed) || isNum(w.waveHeight))),
     odds: race?.odds?.status === 'ok',
+    konsetsu: used.some((u) => u.factor === '今節の平均着順'),
+    courseStats: used.some((u) => u.factor === 'そのコースでの3連対率' || u.factor === 'そのコースでの1着率'),
   };
   for (const m of missing) notes.push(`「${m.factor}」は値が取れていないため予想に入れていません。`);
   for (const u of used) if (u.missingBoats.length) notes.push(`「${u.factor}」は${u.missingBoats.join('・')}号艇の値が無いため、その艇には反映していません。`);
