@@ -151,3 +151,30 @@ test('全レース自動記録: 締切前に記録し、締切後は書き換え
   assert.equal(row.result.payout, 12340);
   assert.ok(row.rankActual >= 1);
 });
+
+test('展示の見張り: 締切15分前を過ぎて展示が未発表なら、短い間隔で取り直して予想に入れる', async () => {
+  const store = tmp();
+  let t = deadlineMs(D, '07:00');
+  const clock = () => t;
+  const sleep = async (ms) => { t += ms; };
+  let published = false;
+  const base = fakeSite();
+  const fetchText = async (url) => {
+    if (url.includes('/beforeinfo') && !published) return { status: 200, text: beforeinfoHtml({ ex: ['', '', '', '', '', ''], noStart: true }) };
+    return base.fetchText(url);
+  };
+  const o = (now) => ({ store, now, fetchText, intervalMs: 0, sleep, clock });
+  await runOnce(o(t));
+  t = deadlineMs(D, '10:12'); // 1R 締切 10:30 の18分前
+  await runOnce(o(t));
+  let v = read(store, `${D}/02.json`);
+  assert.notEqual(v.races[1].before.status, 'ok');
+  // 次の実行: 10:20 開始、見張りは 10:28 まで。10:23 に展示が発表される
+  t = deadlineMs(D, '10:20');
+  const sleep2 = async (ms) => { t += ms; if (t >= deadlineMs(D, '10:23')) published = true; };
+  await runOnce({ ...o(t), sleep: sleep2, watchUntilMs: deadlineMs(D, '10:28') });
+  v = read(store, `${D}/02.json`);
+  assert.equal(v.races[1].before.status, 'ok');
+  assert.equal(v.races[1].auto.reflect.exhibition, true);
+  assert.ok(Date.parse(v.races[1].auto.savedAt) < deadlineMs(D, '10:30'));
+});

@@ -41,8 +41,8 @@ jobs:
             git fetch -q --depth 1 origin data
             git archive FETCH_HEAD | tar -x -C store
           fi
-      - name: 公式サイトから取得
-        run: node scraper/run.mjs store/data
+      - name: 公式サイトから取得(残り時間は展示の見張り)
+        run: WATCH_UNTIL=$(( STARTED_AT + 510 )) node scraper/run.mjs store/data
       - name: データを data ブランチに保存
         run: |
           cd store

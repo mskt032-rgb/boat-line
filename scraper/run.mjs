@@ -7,7 +7,7 @@ import { fileURLToPath } from 'node:url';
 import { cleanDayLabel, parseIndex, parseRacelist, parseBeforeinfo, parseOdds3t, parseResult } from './parse.mjs';
 import { parseRobots, robotsFor } from './robots.mjs';
 import { planTasks, needIndex } from './plan.mjs';
-import { jstDate, addDays, isoNow } from '../app/js/time.js';
+import { jstDate, addDays, isoNow, deadlineMs } from '../app/js/time.js';
 import { VENUES, VENUE_NAME } from '../app/js/venues.js';
 import { recordAutoPredictions, buildAutolog } from './autopred.mjs';
 
@@ -42,7 +42,7 @@ export async function defaultFetchText(url) {
 
 export async function runOnce({
   store, now = Date.now(), fetchText = defaultFetchText, maxRequests = 160, intervalMs = 3000,
-  timeBudgetMs = 8 * 60000, sleep = (ms) => new Promise((r) => setTimeout(r, ms)), clock = () => Date.now(),
+  timeBudgetMs = 8 * 60000, watchUntilMs = null, watchMaxRequests = 40, sleep = (ms) => new Promise((r) => setTimeout(r, ms)), clock = () => Date.now(),
 }) {
   const startedAt = clock();
   const statePath = path.join(store, 'meta', 'state.json');
@@ -69,9 +69,11 @@ export async function runOnce({
 
   let last = 0;
   let robots = null;
+  let reqCap = maxRequests;
+  let timeEnd = startedAt + timeBudgetMs;
   async function get(p) {
-    if (runLog.requests >= maxRequests) throw new StopRun('今回の取得件数の上限に達しました');
-    if (clock() - startedAt > timeBudgetMs) throw new StopRun('今回の取得時間の上限に達しました');
+    if (runLog.requests >= reqCap) throw new StopRun('今回の取得件数の上限に達しました');
+    if (clock() > timeEnd) throw new StopRun('今回の取得時間の上限に達しました');
     if (robots && !robots.allowed(p)) throw Object.assign(new Error(`robots.txt で許可されていないため取得しません: ${p}`), { disallowed: true });
     const gap = Math.max(intervalMs, (robots?.crawlDelay || 0) * 1000);
     const wait = last + gap - clock();
@@ -218,6 +220,59 @@ export async function runOnce({
     }
   } catch (e) { runLog.errors.push(`予想の自動記録: ${e.message}`); }
   saveAll();
+
+  // 展示の見張り: 締切15分前を過ぎても展示が取れていないレースだけ、約1分半おきに取り直す
+  if (watchUntilMs && !runLog.stopped?.includes('応答コード') && robots) {
+    reqCap = runLog.requests + watchMaxRequests;
+    timeEnd = watchUntilMs;
+    let watched = 0;
+    try {
+      while (clock() < watchUntilMs - 20000) {
+        const nowW = clock();
+        const targets = [];
+        for (const [jcd, vdoc] of Object.entries(venueDocs[today] || {})) {
+          for (const race of Object.values(vdoc.races || {})) {
+            const dl = deadlineMs(today, race.deadline);
+            if (dl == null || race.racelist?.status !== 'ok' || race.before?.status === 'ok') continue;
+            const left = dl - nowW;
+            if (left <= 60000 || left > 15 * 60000) continue;
+            if (race.before?.attemptedAt && nowW - Date.parse(race.before.attemptedAt) < 90000) continue;
+            targets.push({ jcd, vdoc, race, dl });
+          }
+        }
+        targets.sort((a, b) => a.dl - b.dl);
+        for (const { jcd, vdoc, race } of targets) {
+          const p = PATHS.beforeinfo(today, jcd, race.rno);
+          const prev = race.before || {};
+          const rec = { ...prev, attemptedAt: isoNow(clock()), source: BASE + p };
+          try {
+            const r = parseBeforeinfo(await get(p));
+            if (r.hasExhibition) Object.assign(rec, { status: 'ok', fetchedAt: isoNow(clock()), data: { boats: r.boats, start: r.start, weather: r.weather }, error: null });
+            else rec.status = prev.status || 'pending';
+            race.before = rec;
+            if (r.hasExhibition) {
+              const po = PATHS.odds3t(today, jcd, race.rno);
+              const o = parseOdds3t(await get(po));
+              if (o.odds) race.odds = { ...(race.odds || {}), attemptedAt: isoNow(clock()), source: BASE + po, status: 'ok', fetchedAt: isoNow(clock()), data: { odds: o.odds, oddsTime: o.oddsTime, final: o.final }, error: null };
+              watched++;
+            }
+          } catch (e) {
+            if (e instanceof StopRun) throw e;
+            rec.error = e.message; race.before = rec;
+          }
+          if (recordAutoPredictions(vdoc, today, clock())) markDirty(today, jcd);
+          markDirty(today, jcd);
+        }
+        saveAll();
+        await sleep(30000);
+      }
+    } catch (e) {
+      if (e instanceof StopRun && /応答コード/.test(e.message)) runLog.stopped = e.message;
+    }
+    runLog.watchedExhibitions = watched;
+    saveAll();
+  }
+
   for (const d of [today, addDays(today, -1)]) {
     if (dayDocs[d]) writeJson(path.join(store, d, 'autolog.json'), buildAutolog(d, venueDocs[d]));
   }
@@ -239,7 +294,8 @@ function writeIndex(store, now) {
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const store = process.argv[2] || 'store/data';
-  runOnce({ store }).then((log) => {
+  const watchUntilMs = process.env.WATCH_UNTIL ? Number(process.env.WATCH_UNTIL) * 1000 : null;
+  runOnce({ store, watchUntilMs }).then((log) => {
     console.log(JSON.stringify({ ...log, errors: log.errors.slice(0, 30) }, null, 1));
   }).catch((e) => { console.error(e); process.exitCode = 0; });
 }

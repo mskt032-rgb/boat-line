@@ -252,7 +252,7 @@ export function selectBets(pred, odds, opt = {}) {
   const warnings = [];
   if (!pred?.ok) return { bets: [], warnings: [pred?.reason || '予想できません'], available: false };
   const p1 = pred.winProb[1] || 0;
-  if (exclude1 && p1 >= 0.45) warnings.push(`1号艇の逃げが有力です(1号艇の1着 推定${(p1 * 100).toFixed(0)}%)。いまは1号艇1着を買い目から外しているので、外れやすくなっています。`);
+  if (exclude1 && p1 >= 0.45) warnings.push(`1号艇の逃げが有力です(1号艇の1着 推定${(p1 * 100).toFixed(0)}%)。いまは「1号艇1着なし」にしているので、外れやすくなっています。`);
   let cands = rankCombos(pred.probs).map(([combo, p]) => ({ combo, p, odds: odds?.[combo] ?? null }));
   if (exclude1) cands = cands.filter((c) => !c.combo.startsWith('1-'));
   cands = cands.filter((c) => c.p > 0);

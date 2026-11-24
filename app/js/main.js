@@ -187,7 +187,7 @@ async function viewRace(date, jcd, rno, fresh) {
 
   // 設定
   html += `<div class="card"><div class="seg" role="group" aria-label="モード">${Object.entries(MODES).map(([k, m]) => `<button data-mode="${k}" class="${prefs.mode === k ? 'on' : ''}">${k} ${m.label}<small>${k === 'A' ? '当たりやすさ' : k === 'B' ? '確率×オッズ' : '高配当'}</small></button>`).join('')}</div>
-    <label class="toggle"><span>1号艇の1着を外す<br><span class="small muted">1号艇が1着の買い目を除きます</span></span>
+    <label class="toggle"><span>1号艇1着なし<br><span class="small muted">オンにすると、1号艇が1着の買い目を除きます</span></span>
     <span class="switch"><input type="checkbox" id="ex1" ${prefs.excludeBoat1First ? 'checked' : ''}><span></span></span></label></div>`;
 
   // 買い目
@@ -297,7 +297,7 @@ function versionsCard(date, jcd, rno, dl, race) {
   const fv = finalVersion(vs, dl);
   const rows = vs.slice().reverse().map((x) => {
     const j = judge(x, race.result);
-    return `<tr><td>第${x.version}版${x === fv ? '<br><span class="na">最終</span>' : ''}</td><td>${fmtTime(x.savedAt)}</td><td>${x.mode} ${x.excludeBoat1First ? '<br><span class="na">1号艇1着除外</span>' : ''}</td>
+    return `<tr><td>第${x.version}版${x === fv ? '<br><span class="na">最終</span>' : ''}</td><td>${fmtTime(x.savedAt)}</td><td>${x.mode} ${x.excludeBoat1First ? '<br><span class="na">1号艇1着なし</span>' : ''}</td>
       <td>${x.bets.length}点</td><td>${j.state === 'done' ? (j.hit ? `<b class="pos">的中 ${j.ret.toLocaleString()}円</b>` : '外れ') : j.state === 'void' ? '中止' : '結果待ち'}</td></tr>`;
   }).join('');
   return `<div class="card"><details><summary>保存した予想の版(${vs.length}件)</summary><div class="tbl-wrap"><table class="t"><thead><tr><th>版</th><th>保存時刻</th><th>モード</th><th>点数</th><th>照合</th></tr></thead><tbody>${rows}</tbody></table></div>
@@ -322,9 +322,9 @@ async function autoCard() {
   const list = done.map((r) => `<tr><td class="l"><a href="#/r/${r.date}/${r.jcd}/${r.rno}">${+r.date.slice(6)}日 ${esc(VENUE_NAME[r.jcd])}${r.rno}R</a>${r.reflect?.exhibition ? '' : '<br><span class="na">展示なし</span>'}</td><td>${combo(r.result.combo, true)}</td><td>${cell(r, 'A_on')}</td><td>${cell(r, 'A_off')}</td></tr>`).join('');
   return `<div class="card"><h2>全レース自動記録(締切直前の予想)</h2>
     <p class="small">画面を開かなくても、全レースの締切直前の予想を自動で記録しています。展示入りの割合: ${pct(a.exhibitionShare, 0)}</p>
-    <div class="tbl-wrap"><table class="t"><thead><tr><th class="l">モード</th><th>1号艇1着<br>外す</th><th>1号艇1着<br>外さない</th></tr></thead><tbody>${line('A')}${line('B')}${line('C')}</tbody></table></div>
+    <div class="tbl-wrap"><table class="t"><thead><tr><th class="l">モード</th><th>1号艇1着<br>なし</th><th>1号艇1着<br>あり</th></tr></thead><tbody>${line('A')}${line('B')}${line('C')}</tbody></table></div>
     <p class="small muted">各買い目100円。B・Cはオッズが取れたレースだけで集計。</p>
-    <details><summary>レースごとの結果(${done.length}件・モードA)</summary><div class="tbl-wrap"><table class="t"><thead><tr><th class="l">レース</th><th>結果</th><th>外す</th><th>外さない</th></tr></thead><tbody>${list}</tbody></table></div></details></div>`;
+    <details><summary>レースごとの結果(${done.length}件・モードA)</summary><div class="tbl-wrap"><table class="t"><thead><tr><th class="l">レース</th><th>結果</th><th>1号艇1着<br>なし</th><th>1号艇1着<br>あり</th></tr></thead><tbody>${list}</tbody></table></div></details></div>`;
 }
 
 async function viewStats() {
@@ -366,8 +366,8 @@ async function viewStats() {
   const doneRows = cmp.filter((x) => x.j.state !== 'waiting').sort(order).map(rowOf).join('');
   const waitList = cmp.filter((x) => x.j.state === 'waiting').sort(order);
   const recent = doneRows || '<tr><td colspan="4" class="muted">結果が出たレースはまだありません</td></tr>';
-  const cmpCard = `<div class="card"><h2>1号艇1着を「外す」と「外さない」の比較</h2>
-    <div class="tbl-wrap"><table class="t"><thead><tr><th></th><th>外す</th><th>外さない</th></tr></thead><tbody>
+  const cmpCard = `<div class="card"><h2>「1号艇1着なし」と「1号艇1着あり」の比較</h2>
+    <div class="tbl-wrap"><table class="t"><thead><tr><th></th><th>1号艇1着<br>なし</th><th>1号艇1着<br>あり</th></tr></thead><tbody>
     <tr><td class="l">的中率</td><td><b>${pct(sOn.hitRate)}</b><br><span class="na">${sOn.hits}/${sOn.betRaces}</span></td><td><b>${pct(sOff.hitRate)}</b><br><span class="na">${sOff.hits}/${sOff.betRaces}</span></td></tr>
     <tr><td class="l">回収率</td><td><b>${pct(sOn.recovery, 0)}</b><br><span class="na">${sOn.ret.toLocaleString()}/${sOn.stake.toLocaleString()}円</span></td><td><b>${pct(sOff.recovery, 0)}</b><br><span class="na">${sOff.ret.toLocaleString()}/${sOff.stake.toLocaleString()}円</span></td></tr>
     </tbody></table></div><p class="small muted">締切前に保存した最終版の確率から、モードA(的中重視)で両方の買い目を作り直して比べています。各買い目100円。</p></div>`;
@@ -383,7 +383,7 @@ async function viewStats() {
       ${bucketRows ? `<div class="tbl-wrap"><table class="t"><thead><tr><th>予想確率の帯</th><th>件数</th><th>予想の平均</th><th>実際に出た割合</th></tr></thead><tbody>${bucketRows}</tbody></table></div>` : '<p class="muted">結果が出たレースがまだありません。</p>'}
       ${s.winTop.n ? `<p class="small">1着予想(一番確率が高い艇): 予想の平均 ${pct(s.winTop.avgP)} → 実際の的中 ${pct(s.winTop.rate)}(${s.winTop.n}レース)</p>` : ''}
       ${s.logLoss != null ? `<p class="small muted">対数損失 ${s.logLoss.toFixed(2)}(でたらめに120通りを均等に見た場合 ${s.uniformLogLoss.toFixed(2)}。小さいほど良い)</p>` : ''}</div>
-    <div class="card"><h2>レースごとの結果(${cmp.length - waitList.length}件)</h2><div class="tbl-wrap"><table class="t"><thead><tr><th class="l">レース</th><th>結果</th><th>外す</th><th>外さない</th></tr></thead><tbody>${recent}</tbody></table></div>
+    <div class="card"><h2>レースごとの結果(${cmp.length - waitList.length}件)</h2><div class="tbl-wrap"><table class="t"><thead><tr><th class="l">レース</th><th>結果</th><th>1号艇1着<br>なし</th><th>1号艇1着<br>あり</th></tr></thead><tbody>${recent}</tbody></table></div>
       ${waitList.length ? `<details><summary>結果待ち(${waitList.length}件)</summary><div class="tbl-wrap"><table class="t"><tbody>${waitList.map(rowOf).join('')}</tbody></table></div></details>` : ''}</div>`;
 }
 
