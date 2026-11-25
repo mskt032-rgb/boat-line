@@ -42,7 +42,18 @@ jobs:
             git archive FETCH_HEAD | tar -x -C store
           fi
       - name: 公式サイトから取得(残り時間は展示の見張り)
-        run: WATCH_UNTIL=$(( STARTED_AT + 510 )) node scraper/run.mjs store/data
+        run: WATCH_UNTIL=$(( STARTED_AT + 510 )) ARCHIVE_OUT=archive-out node scraper/run.mjs store/data
+      - name: 45日より古い日を archive ブランチに保存(1年以上残す)
+        run: |
+          if [ -d archive-out ] && [ -n "$(ls -A archive-out)" ]; then
+            url="https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git"
+            git clone -q --depth 1 --branch archive "$url" arch 2>/dev/null || { mkdir arch && git -C arch init -q -b archive; }
+            cp -r archive-out/. arch/
+            cd arch
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add -A && git commit -qm "archive $(ls ../archive-out/*/ | tr '\n' ' ')" && git push -q "$url" HEAD:archive
+          fi
       - name: データを data ブランチに保存
         run: |
           cd store

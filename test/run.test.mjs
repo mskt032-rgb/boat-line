@@ -195,3 +195,23 @@ test('選手のコース別成績を取得して保存し、自動記録の予�
   assert.equal(v.races[2].auto.reflect.courseStats, true);
   assert.equal(v.races[2].auto.reflect.konsetsu, true);
 });
+
+test('45日より古い日は圧縮して保管場所へ移し、日ごとの集計は残す', async () => {
+  const zlib = await import('node:zlib');
+  const store = tmp();
+  const archiveDir = tmp();
+  const site = fakeSite();
+  await runOnce(opts(store, site, deadlineMs(D, '07:00')));
+  await runOnce(opts(store, site, deadlineMs(D, '10:15')));
+  await runOnce(opts(store, site, deadlineMs(D, '10:45')));
+  const stats = read(store, 'stats-days.json');
+  assert.ok(stats.days[D].A_off.races >= 1);
+  const later = deadlineMs(D, '10:45') + 50 * 86400000;
+  await runOnce({ ...opts(store, site, later), archiveDir });
+  assert.equal(fs.existsSync(path.join(store, D)), false);
+  const gz = path.join(archiveDir, D.slice(0, 4), `${D}.json.gz`);
+  const bundle = JSON.parse(zlib.gunzipSync(fs.readFileSync(gz)).toString());
+  assert.ok(bundle.files['02.json'].races['1'].auto);
+  assert.ok(bundle.files['autolog.json'].rows.length > 0);
+  assert.ok(read(store, 'stats-days.json').days[D].A_off.races >= 1, '集計は消えない');
+});

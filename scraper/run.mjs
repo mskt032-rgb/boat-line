@@ -2,6 +2,7 @@
 // 方針: robots.txt を毎回確認し許可された場所だけ、3秒以上の間隔、1回あたり最大160件・8分まで(10分ごとの実行が重ならないように)。
 // 403/429/503 など「アクセスを控えて」という応答があれば、その回は即座にやめて30分休む(回避はしない)。
 import fs from 'node:fs';
+import zlib from 'node:zlib';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseRacerCourse, cleanDayLabel, parseIndex, parseRacelist, parseBeforeinfo, parseOdds3t, parseResult } from './parse.mjs';
@@ -10,10 +11,12 @@ import { planTasks, needIndex } from './plan.mjs';
 import { jstDate, addDays, isoNow, deadlineMs } from '../app/js/time.js';
 import { VENUES, VENUE_NAME } from '../app/js/venues.js';
 import { recordAutoPredictions, buildAutolog } from './autopred.mjs';
+import { summarizeAutolog } from '../app/js/verify.js';
 
 export const BASE = 'https://www.boatrace.jp';
 export const UA = 'BOAT-LINE-personal/1.0 (personal non-commercial use; +https://github.com/mskt032-rgb/boat-line)';
-const KEEP_DAYS = 45;
+const KEEP_DAYS = 45; // アプリで1レースずつ見られる期間。これより古い日は圧縮して archive ブランチへ(1年以上残す)
+export const STAT_KEYS = ['A_on', 'A_off', 'B2', 'C2'];
 
 const PATHS = {
   index: (d) => `/owpc/pc/race/index?hd=${d}`,
@@ -43,7 +46,7 @@ export async function defaultFetchText(url) {
 
 export async function runOnce({
   store, now = Date.now(), fetchText = defaultFetchText, maxRequests = 160, intervalMs = 3000,
-  timeBudgetMs = 8 * 60000, watchUntilMs = null, watchMaxRequests = 40, sleep = (ms) => new Promise((r) => setTimeout(r, ms)), clock = () => Date.now(),
+  timeBudgetMs = 8 * 60000, watchUntilMs = null, archiveDir = null, watchMaxRequests = 40, sleep = (ms) => new Promise((r) => setTimeout(r, ms)), clock = () => Date.now(),
 }) {
   const startedAt = clock();
   const statePath = path.join(store, 'meta', 'state.json');
@@ -309,16 +312,51 @@ export async function runOnce({
   }
 
   for (const d of [today, addDays(today, -1)]) {
-    if (dayDocs[d]) writeJson(path.join(store, d, 'autolog.json'), buildAutolog(d, venueDocs[d]));
+    if (dayDocs[d]) {
+      const log = buildAutolog(d, venueDocs[d]);
+      writeJson(path.join(store, d, 'autolog.json'), log);
+      updateDayStats(store, d, log.rows);
+    }
   }
-  prune(store, today);
+  // 集計がまだ無い日(この機能より前の日など)を埋める
+  try {
+    const have = readJson(path.join(store, 'stats-days.json'), { days: {} }).days;
+    for (const d of fs.readdirSync(store).filter((x) => /^\d{8}$/.test(x) && !have[x])) {
+      const log = readJson(path.join(store, d, 'autolog.json'), null);
+      if (log?.rows?.length) updateDayStats(store, d, log.rows);
+    }
+  } catch (e) { runLog.errors.push(`日ごとの集計: ${e.message}`); }
+  prune(store, today, archiveDir);
   return finish();
 }
 
-function prune(store, today) {
+/** 日ごとの成績の集計(小さいので消さずに残す。成績画面の「全期間」「日ごと」に使う) */
+export function updateDayStats(store, date, rows) {
+  const file = path.join(store, 'stats-days.json');
+  const all = readJson(file, { days: {} });
+  const day = {};
+  for (const k of STAT_KEYS) {
+    const s = summarizeAutolog(rows, k);
+    day[k] = { races: s.races, hits: s.hits, stake: s.stake, ret: s.ret, exh: Math.round((s.exhibitionShare || 0) * s.races) };
+  }
+  all.days[date] = day;
+  all.updatedAt = isoNow();
+  writeJson(file, all);
+}
+
+/** 45日より古い日: archiveDir があれば1日1ファイルに圧縮して渡し、公開用からは外す */
+function prune(store, today, archiveDir) {
   const limit = addDays(today, -KEEP_DAYS);
   for (const d of fs.existsSync(store) ? fs.readdirSync(store) : []) {
-    if (/^\d{8}$/.test(d) && d < limit) fs.rmSync(path.join(store, d), { recursive: true, force: true });
+    if (!/^\d{8}$/.test(d) || d >= limit) continue;
+    const dir = path.join(store, d);
+    if (archiveDir) {
+      const bundle = { date: d, files: {} };
+      for (const f of fs.readdirSync(dir)) bundle.files[f] = readJson(path.join(dir, f), null);
+      fs.mkdirSync(path.join(archiveDir, d.slice(0, 4)), { recursive: true });
+      fs.writeFileSync(path.join(archiveDir, d.slice(0, 4), `${d}.json.gz`), zlib.gzipSync(JSON.stringify(bundle)));
+    }
+    fs.rmSync(dir, { recursive: true, force: true });
   }
 }
 
@@ -330,7 +368,8 @@ function writeIndex(store, now) {
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const store = process.argv[2] || 'store/data';
   const watchUntilMs = process.env.WATCH_UNTIL ? Number(process.env.WATCH_UNTIL) * 1000 : null;
-  runOnce({ store, watchUntilMs }).then((log) => {
+  const archiveDir = process.env.ARCHIVE_OUT || null;
+  runOnce({ store, watchUntilMs, archiveDir }).then((log) => {
     console.log(JSON.stringify({ ...log, errors: log.errors.slice(0, 30) }, null, 1));
   }).catch((e) => { console.error(e); process.exitCode = 0; });
 }
