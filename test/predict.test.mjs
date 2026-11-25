@@ -150,3 +150,14 @@ test('欠場: オッズでその艇の組だけ全部出ていなければ外す
   r.before.data.boats[4].absent = true;
   assert.equal(predictRace(r).winProb[5], 0);
 });
+
+test('B・Cは最低6点(期待値1倍以上が少なければ期待値の高い順に足す)、最大12点', () => {
+  const p = predictRace(makeRace());
+  const odds = flatOdds(30);
+  odds['2-3-4'] = 95; // 期待値の高い組が少ない状態
+  const b = selectBets(p, odds, { mode: 'B' });
+  assert.ok(b.bets.length >= 6 && b.bets.length <= 12);
+  for (let i = 1; i < b.bets.length; i++) assert.ok(b.bets[i - 1].ev >= b.bets[i].ev || b.bets[i - 1].ev >= 1);
+  const c = selectBets(p, flatOdds(500), { mode: 'C' });
+  assert.ok(c.bets.length >= 6 && c.bets.length <= 12);
+});

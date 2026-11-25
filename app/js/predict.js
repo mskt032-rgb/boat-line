@@ -292,11 +292,16 @@ export function selectBets(pred, odds, opt = {}) {
     let pool = cands.filter((c) => c.odds != null && c.p >= 0.003);
     pool = mode === 'C' ? pool.filter((c) => c.odds >= 100) : pool.filter((c) => c.odds < 100);
     pool.sort((a, b) => b.ev - a.ev);
+    // 期待値1倍以上の組を優先し、6点に足りなければ期待値の高い順に足す(最低6点・最大12点)
+    const MIN_POINTS = Math.min(6, maxPoints);
     const good = pool.filter((c) => c.ev >= 1.0);
-    if (good.length) bets = good.slice(0, maxPoints);
-    else {
-      bets = pool.slice(0, Math.min(5, maxPoints));
-      if (bets.length) warnings.push('期待値が1倍(回収率100%)を超える見込みの買い目がありません。参考として期待値の高い順に表示しています。');
+    bets = good.slice(0, maxPoints);
+    if (bets.length < MIN_POINTS) {
+      const extra = pool.filter((c) => c.ev < 1.0).slice(0, MIN_POINTS - bets.length);
+      if (extra.length) warnings.push(good.length
+        ? `期待値が1倍を超える組が${good.length}点だけだったので、期待値の高い順に${extra.length}点を足して${good.length + extra.length}点にしています。`
+        : '期待値が1倍(回収率100%)を超える見込みの組がありません。期待値の高い順に表示しています。');
+      bets = bets.concat(extra);
     }
     if (!bets.length) warnings.push('条件に合う買い目がありません。');
   }
