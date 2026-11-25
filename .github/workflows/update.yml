@@ -57,6 +57,10 @@ jobs:
           mkdir -p _site
           cp -r app/. _site/
           cp -r store/data _site/data
+          # 版ごとに読み込み先の名前を変え、iPhoneに残った古い部品を使わせない
+          v=${GITHUB_SHA::8}
+          sed -i "s#js/main.js#js/main.js?v=$v#; s#style.css#style.css?v=$v#" _site/index.html
+          sed -i -E "s#from '\./([a-z]+)\.js'#from './\1.js?v=$v'#g" _site/js/*.js
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
