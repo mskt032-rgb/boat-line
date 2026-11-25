@@ -60,6 +60,64 @@ function statusChip(slot, label, rec) {
   return `<span class="chip">${label}</span>`;
 }
 
+
+// 予想のひとこと(締切前に記録した予想から)
+function raceHint(race) {
+  const w = race?.auto?.winProb;
+  if (!w) return '';
+  const top = Object.entries(w).sort((a, b) => b[1] - a[1])[0];
+  const p1 = w[1] || 0;
+  let tag;
+  if (p1 >= 0.6) tag = '逃げ濃厚';
+  else if (p1 >= 0.45) tag = '逃げ有力';
+  else if (top[1] < 0.3) tag = '混戦';
+  else if (top[0] !== '1') tag = `${top[0]}号艇有力`;
+  else tag = 'やや荒れ';
+  return `<span class="hint">本命 ${bn(top[0], true)} <b>${pct(top[1], 0)}</b>・${tag}</span>`;
+}
+
+// これから締切のレースを全場まとめて時間順に
+function upcomingRaces(date, venues, vdocs, now) {
+  const out = [];
+  venues.forEach((v, i) => {
+    for (const r of Object.values(vdocs[i]?.races || {})) {
+      const dl = deadlineMs(date, r.deadline);
+      if (dl && dl > now) out.push({ jcd: v.jcd, name: v.name, race: r, dl });
+    }
+  });
+  return out.sort((a, b) => a.dl - b.dl);
+}
+function soonList(date, list) {
+  const now = Date.now();
+  return `<ul class="soon">${list.map((x) => `<li><a href="#/r/${date}/${x.jcd}/${x.race.rno}"><span class="t">${esc(x.race.deadline)}</span><span class="v">${esc(x.name)} ${x.race.rno}R</span>${raceHint(x.race)}<span class="left">あと${Math.max(0, Math.round((x.dl - now) / 60000))}分</span></a></li>`).join('')}</ul>`;
+}
+
+// 自動取得が止まっていないかの確認(開催時間中に30分以上更新が無ければ知らせる)
+async function checkStale() {
+  const el = document.getElementById('alert');
+  const idx = await getJson('index.json', { fresh: true });
+  const p = jstParts();
+  const min = p.hh * 60 + p.mm;
+  const late = idx?.updatedAt && Date.now() - Date.parse(idx.updatedAt) > 30 * 60000;
+  el.innerHTML = late && min >= 390 && min <= 1370
+    ? `<div class="note bad">自動取得が${Math.round((Date.now() - Date.parse(idx.updatedAt)) / 60000)}分止まっています(最終更新 ${fmtTime(idx.updatedAt)})。しばらく待っても直らなければ、Claudeに知らせてください。</div>`
+    : '';
+}
+setInterval(() => { if (document.visibilityState === 'visible') checkStale(); }, 120000);
+
+async function viewSoon(fresh) {
+  setTab('home');
+  const date = jstDate();
+  const day = await getJson(`${date}/day.json`, { fresh });
+  const held = (day?.venues || []).filter((v) => v.held);
+  const vdocs = await Promise.all(held.map((v) => getJson(`${date}/${v.jcd}.json`, { fresh })));
+  const list = upcomingRaces(date, held, vdocs, Date.now());
+  app.innerHTML = `<a class="back" href="#/">‹ 場の一覧</a><h1>締切が近い順</h1>
+    ${list.length ? `<div class="card" style="padding:4px 10px">${soonList(date, list)}</div>` : '<div class="card"><p>今日これから締切のレースはありません。</p></div>'}
+    <p class="small muted">「本命」は締切前の予想で1着の確率が一番高い艇です。開いている間は2分ごとに更新します。</p>`;
+  autoRefresh((f) => viewSoon(f));
+}
+
 // ---------- ホーム(場の一覧) ----------
 async function viewHome(date, fresh) {
   setTab('home');
@@ -95,6 +153,7 @@ async function viewHome(date, fresh) {
   const ix = day.index || {};
   app.innerHTML = `<div class="datebar">${datebar}</div>
     <h1>${fmtDate(date)}(${wd(date)}) 開催 ${held.length}場</h1>
+    ${(() => { const up = date === jstDate() ? upcomingRaces(date, held, vdocs, now) : []; return up.length ? `<div class="card" style="padding:10px 10px 4px"><div class="row between"><h2 style="margin:0 4px">もうすぐ締切</h2><a href="#/soon" class="small">すべて見る ›</a></div>${soonList(date, up.slice(0, 5))}</div>` : ''; })()}
     ${ix.status === 'error' ? `<div class="note bad">開催場一覧の最新取得に失敗しました(${esc(ix.error)})。前回取得分を表示しています。</div>` : ''}
     <div class="grid">${cards}</div>
     <p class="small muted">開催情報の取得: ${fmtTime(ix.fetchedAt)} / 出典: <a href="${esc(ix.source || 'https://www.boatrace.jp/')}" rel="noopener" target="_blank">BOAT RACE公式サイト</a></p>`;
@@ -127,9 +186,9 @@ async function viewVenue(date, jcd, fresh) {
       resultHtml = `<span class="chip ${j?.hit ? 'ok' : ''}">結果 ${res}${j ? (j.hit ? ' 的中' : '') : ''}</span>`;
     }
     items.push(`<li><a href="#/r/${date}/${jcd}/${r}"><span class="rno">${r}R</span><span class="dl">${esc(race.deadline || '--:--')}</span>
-      <span class="chips">${resultHtml || (dl && dl < now
+      <span class="chips">${resultHtml ? raceHint(race) + resultHtml : (dl && dl < now
         ? (race.result?.canceled ? '<span class="chip">中止</span>' : '<span class="chip wait">結果 取得待ち</span>')
-        : [statusChip('racelist', '出走表', race.racelist), statusChip('before', '展示', race.before), statusChip('odds', 'オッズ', race.odds)].join(''))}
+        : raceHint(race) + [statusChip('before', '展示', race.before), statusChip('odds', 'オッズ', race.odds)].join(''))}
       ${saved.length ? '<span class="chip ok">予想保存</span>' : ''}</span></a></li>`);
   }
   app.innerHTML = `${head}<div class="card" style="padding:0 4px"><ul class="races">${items.join('')}</ul></div>
@@ -507,10 +566,12 @@ async function viewSettings() {
 
 // ---------- 画面の切り替え ----------
 function route() {
+  checkStale();
   const h = location.hash.replace(/^#\/?/, '').split('/');
   window.scrollTo(0, 0);
   if (h[0] === 'v' && h[2]) return viewVenue(h[1], h[2]);
   if (h[0] === 'r' && h[3]) return viewRace(h[1], h[2], h[3]);
+  if (h[0] === 'soon') return viewSoon();
   if (h[0] === 'stats') return viewStats(/^\d{8}$/.test(h[1] || '') ? h[1] : null);
   if (h[0] === 'settings') return viewSettings();
   if (h[0] === 'd' && h[1]) return viewHome(h[1]);
