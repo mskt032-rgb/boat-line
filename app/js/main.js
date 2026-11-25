@@ -350,7 +350,7 @@ function dayTable(rows) {
     return `<tr><td class="l">${fmtDate(d)}<br><span class="na">${Math.max(on.races, off.races)}R</span></td><td>${c(on)}</td><td>${c(off)}</td><td>${c(b2)}</td><td>${c(c2)}</td></tr>`;
   }).join('');
   if (!body) return '';
-  return `<h3>日ごとの成績</h3><div class="tbl-wrap"><table class="t"><thead><tr><th class="l">日付</th><th>A<br>1着なし</th><th>A<br>1着あり</th><th>B<br>回収率</th><th>C<br>万舟</th></tr></thead><tbody>${body}</tbody></table></div>
+  return `<h3>日ごとの成績</h3><div class="tbl-wrap"><table class="t"><thead><tr><th class="l">日付</th><th>A<br>1着なし</th><th>A<br>1着あり</th><th>B<br>中穴</th><th>C<br>万舟</th></tr></thead><tbody>${body}</tbody></table></div>
     <p class="small muted">上の段が的中率、下の段が回収率です。</p>`;
 }
 
