@@ -285,6 +285,12 @@ function gradedCard(date, jcd, rno, dl, race, now) {
     <details ${off?.includes(res) ? 'open' : ''}><summary>1号艇1着あり(${off?.length ?? 0}点)${off?.includes(res) ? ' — 的中' : ''}</summary>${list(off)}</details>`;
   let h = '';
   if (race.auto) h += block('全レース自動記録の予想(モードA)', `締切前 ${fmtTime(race.auto.savedAt)} に記録${race.auto.reflect?.exhibition ? '(展示入り)' : '(展示なし)'}`, race.auto.bets?.A_on, race.auto.bets?.A_off);
+  if (race.auto?.bets && ('B2' in race.auto.bets || 'C2' in race.auto.bets)) {
+    for (const [key, title] of [['B2', 'B 中穴狙い'], ['C2', 'C 万舟狙い']]) {
+      const b = race.auto.bets[key];
+      h += `<details ${b?.includes(res) ? 'open' : ''}><summary>${title}(${b?.length ?? 0}点)${b?.includes(res) ? ' — 的中' : ''}</summary>${b ? list(b) : '<p class="na">オッズが無く計算していません</p>'}</details>`;
+    }
+  }
   const fv = finalVersion(predictionsFor(date, jcd, rno), dl);
   if (fv) { const c = compareExclusion(fv, race.result); h += block('この端末で保存した予想(モードA)', `第${fv.version}版・締切前 ${fmtTime(fv.savedAt)} に保存${fv.reflect?.exhibition ? '(展示入り)' : '(展示なし)'}`, c.on.bets.map((b) => b.combo), c.off.bets.map((b) => b.combo)); }
   if (!h) return '';
@@ -372,13 +378,13 @@ async function autoCard(sel) {
   const a = summarizeAutolog(rows, 'A_off');
   const cell = (r, k) => { const b = r.bets?.[k]; if (!b) return '<span class="na">—</span>'; if (!r.result?.combo) return '—'; return b.includes(r.result.combo) ? `<b class="pos">◯ ${(r.result.payout || 0).toLocaleString()}円</b>` : '×'; };
   const done = rows.filter((r) => r.result?.combo).sort((x, y) => (y.date + y.deadline).localeCompare(x.date + x.deadline));
-  const list = done.map((r) => `<tr><td class="l"><a href="#/r/${r.date}/${r.jcd}/${r.rno}">${+r.date.slice(6)}日 ${esc(VENUE_NAME[r.jcd])}${r.rno}R</a>${r.reflect?.exhibition ? '' : '<br><span class="na">展示なし</span>'}</td><td>${combo(r.result.combo, true)}</td><td>${cell(r, 'A_on')}</td><td>${cell(r, 'A_off')}</td></tr>`).join('');
+  const list = done.map((r) => `<tr><td class="l"><a href="#/r/${r.date}/${r.jcd}/${r.rno}">${+r.date.slice(6)}日 ${esc(VENUE_NAME[r.jcd])}${r.rno}R</a>${r.reflect?.exhibition ? '' : '<br><span class="na">展示なし</span>'}</td><td>${combo(r.result.combo, true)}</td><td>${cell(r, 'A_on')}</td><td>${cell(r, 'A_off')}</td><td>${cell(r, 'B2')}</td><td>${cell(r, 'C2')}</td></tr>`).join('');
   return `${bar}<div class="card"><h2>${sel ? `${fmtDate(sel)}(${wd(sel)})の成績` : '全期間の成績'}(締切直前の予想)</h2>
     <p class="small">画面を開かなくても、全レースの締切直前の予想を自動で記録しています。展示入りの割合: ${pct(a.exhibitionShare, 0)}</p>
     <div class="tbl-wrap"><table class="t"><thead><tr><th class="l">モード</th><th>1号艇1着<br>なし</th><th>1号艇1着<br>あり</th></tr></thead><tbody>${line('A')}${line('B')}${line('C')}</tbody></table></div>
     <p class="small muted">各買い目100円。B(オッズ100倍未満)・C(100倍以上の万舟)は「1号艇1着なし/あり」で分けず、オッズが取れたレースだけで集計(11月25日夜からの記録)。</p>
     ${sel ? '' : dayTable(rows)}
-    <details><summary>レースごとの結果(${done.length}件・モードA)</summary><div class="tbl-wrap"><table class="t"><thead><tr><th class="l">レース</th><th>結果</th><th>1号艇1着<br>なし</th><th>1号艇1着<br>あり</th></tr></thead><tbody>${list}</tbody></table></div></details></div>`;
+    <details><summary>レースごとの結果(${done.length}件)</summary><div class="tbl-wrap"><table class="t"><thead><tr><th class="l">レース</th><th>結果</th><th>A<br>1着なし</th><th>A<br>1着あり</th><th>B<br>中穴</th><th>C<br>万舟</th></tr></thead><tbody>${list}</tbody></table></div></details></div>`;
 }
 
 async function viewStats(sel) {
