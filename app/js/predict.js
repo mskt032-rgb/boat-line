@@ -260,8 +260,8 @@ export function rankCombos(probs) {
 
 export const MODES = {
   A: { label: '的中重視', desc: '当たる確率が高い順に選びます' },
-  B: { label: '回収率重視', desc: '推定確率×オッズ(期待値)が高い順に選びます' },
-  C: { label: '穴狙い', desc: 'オッズ20倍以上の中から期待値が高い順に選びます' },
+  B: { label: '回収率重視', desc: 'オッズ100倍未満の中から、推定確率×オッズ(期待値)が高い順に選びます' },
+  C: { label: '万舟狙い', desc: 'オッズ100倍以上の中から、期待値が高い順に選びます' },
 };
 
 /**
@@ -273,7 +273,7 @@ export const MODES = {
 export function selectBets(pred, odds, opt = {}) {
   const mode = opt.mode || 'A';
   const maxPoints = Math.min(12, Math.max(1, opt.maxPoints || 12));
-  const exclude1 = opt.excludeBoat1First !== false;
+  const exclude1 = mode === 'A' && opt.excludeBoat1First !== false; // 「1号艇1着なし」はモードAだけ
   const warnings = [];
   if (!pred?.ok) return { bets: [], warnings: [pred?.reason || '予想できません'], available: false };
   const p1 = pred.winProb[1] || 0;
@@ -290,7 +290,7 @@ export function selectBets(pred, odds, opt = {}) {
   } else {
     if (!hasOdds) return { bets: [], warnings: [...warnings, 'オッズがまだ取得できていないため、このモードは計算できません。オッズは締切の約25分前から取得します。'], available: false };
     let pool = cands.filter((c) => c.odds != null && c.p >= 0.003);
-    if (mode === 'C') pool = pool.filter((c) => c.odds >= 20);
+    pool = mode === 'C' ? pool.filter((c) => c.odds >= 100) : pool.filter((c) => c.odds < 100);
     pool.sort((a, b) => b.ev - a.ev);
     const good = pool.filter((c) => c.ev >= 1.0);
     if (good.length) bets = good.slice(0, maxPoints);

@@ -19,10 +19,9 @@ export function recordAutoPredictions(vdoc, date, nowMs, getRacer = () => null) 
     if (!pred.ok) continue;
     const odds = race.odds?.status === 'ok' ? race.odds.data.odds : null;
     const bets = {};
-    for (const m of MODES) for (const [k, ex] of [['on', true], ['off', false]]) {
-      const r = selectBets(pred, odds, { mode: m, excludeBoat1First: ex });
-      bets[`${m}_${k}`] = r.available ? r.bets.map((b) => b.combo) : null;
-    }
+    for (const [k, ex] of [['on', true], ['off', false]]) bets[`A_${k}`] = selectBets(pred, odds, { mode: 'A', excludeBoat1First: ex }).bets.map((b) => b.combo);
+    // B(100倍未満)・C(万舟 100倍以上)は「1号艇1着なし/あり」で分けない。古い記録の B_on 等とは別の名前で残す
+    for (const m of ['B', 'C']) { const r = selectBets(pred, odds, { mode: m }); bets[`${m}2`] = r.available ? r.bets.map((b) => b.combo) : null; }
     race.auto = {
       savedAt: new Date(nowMs).toISOString(), stamp, modelVersion: pred.modelVersion,
       reflect: { exhibition: pred.reflect.exhibition, course: pred.reflect.course, odds: pred.reflect.odds, konsetsu: pred.reflect.konsetsu, courseStats: pred.reflect.courseStats },

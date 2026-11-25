@@ -107,19 +107,23 @@ test('モードB/C: オッズ未取得なら計算しない', () => {
 
 test('モードB: 期待値(確率×オッズ)順、最大12点', () => {
   const p = predictRace(makeRace());
-  const r = selectBets(p, flatOdds(200), { mode: 'B', excludeBoat1First: false });
+  const r = selectBets(p, flatOdds(80), { mode: 'B' });
+  assert.ok(r.bets.every((b) => b.odds < 100));
   assert.ok(r.bets.length <= 12 && r.bets.length > 0);
   for (const b of r.bets) assert.ok(Math.abs(b.ev - b.p * b.odds) < 1e-12);
   for (let i = 1; i < r.bets.length; i++) assert.ok(r.bets[i - 1].ev >= r.bets[i].ev);
 });
 
-test('モードC: 20倍未満は選ばない', () => {
+test('モードC(万舟狙い): 100倍未満は選ばない / Bは100倍以上を選ばない / B・Cは1号艇1着を除外しない', () => {
   const odds = flatOdds(10);
-  odds['2-3-4'] = 80; odds['4-5-6'] = 300; odds['5-6-4'] = 150;
+  odds['2-3-4'] = 80; odds['4-5-6'] = 300; odds['5-6-4'] = 150; odds['1-5-6'] = 400;
   const p = predictRace(makeRace());
-  const r = selectBets(p, odds, { mode: 'C' });
+  const r = selectBets(p, odds, { mode: 'C', excludeBoat1First: true });
   assert.ok(r.bets.length > 0);
-  assert.ok(r.bets.every((b) => b.odds >= 20));
+  assert.ok(r.bets.every((b) => b.odds >= 100));
+  assert.ok(r.bets.some((b) => b.combo === '1-5-6'));
+  const b = selectBets(p, odds, { mode: 'B', excludeBoat1First: true });
+  assert.ok(b.bets.every((x) => x.odds < 100));
 });
 
 test('締切時点の予想: 締切後に取得した直前情報・オッズは使わない', async () => {
