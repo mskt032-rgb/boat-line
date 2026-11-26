@@ -186,7 +186,7 @@ async function viewVenue(date, jcd, fresh) {
       const fv = finalVersion(saved, dl);
       const j = fv ? judge(fv, race.result) : null;
       const ab = race.auto?.bets || {};
-      const hitL = [['A_on', 'Aなし'], ['A_off', 'Aあり'], ['B2', 'B'], ['C2', 'C']].filter(([k]) => ab[k]?.includes(res)).map(([, l]) => l);
+      const hitL = [['A_on', 'Aなし'], ['A_off', 'Aあり'], ['B3', 'B'], ['C2', 'C']].filter(([k]) => ab[k]?.includes(res)).map(([, l]) => l);
       const marks = race.auto ? (hitL.length ? `<span class="chip ok">◯ ${hitL.join('・')}</span>` : '<span class="chip">外れ</span>') : '';
       resultHtml = `<span class="chip">結果 ${res}</span>${marks}`;
     }
@@ -351,8 +351,8 @@ function gradedCard(date, jcd, rno, dl, race, now) {
     <details ${off?.includes(res) ? 'open' : ''}><summary>1号艇1着あり(${off?.length ?? 0}点)${off?.includes(res) ? ' — 的中' : ''}</summary>${list(off)}</details>`;
   let h = '';
   if (race.auto) h += block('全レース自動記録の予想(モードA)', `締切前 ${fmtTime(race.auto.savedAt)} に記録${race.auto.reflect?.exhibition ? '(展示入り)' : '(展示なし)'}`, race.auto.bets?.A_on, race.auto.bets?.A_off);
-  if (race.auto?.bets && ('B2' in race.auto.bets || 'C2' in race.auto.bets)) {
-    for (const [key, title] of [['B2', 'B 中穴狙い'], ['C2', 'C 万舟狙い']]) {
+  if (race.auto?.bets && ('B3' in race.auto.bets || 'C2' in race.auto.bets)) {
+    for (const [key, title] of [['B3', 'B 中穴狙い'], ['C2', 'C 万舟狙い']]) {
       const b = race.auto.bets[key];
       h += `<details ${b?.includes(res) ? 'open' : ''}><summary>${title}(${b?.length ?? 0}点)${b?.includes(res) ? ' — 的中' : ''}</summary>${b ? list(b) : '<p class="na">オッズが無く計算していません</p>'}</details>`;
     }
@@ -412,13 +412,13 @@ function versionsCard(date, jcd, rno, dl, race) {
 
 // ---------- 成績 ----------
 // 成績の集計: 日ごとの集計ファイル(stats-days.json、ずっと残る)を基本にし、無い日は記録から計算する
-const STAT_KEYS = ['A_on', 'A_off', 'B2', 'C2'];
+const STAT_KEYS = ['A_on', 'A_off', 'B2', 'B3', 'C2'];
 const statOfRows = (rows) => Object.fromEntries(STAT_KEYS.map((k) => { const x = summarizeAutolog(rows, k); return [k, { races: x.races, hits: x.hits, stake: x.stake, ret: x.ret, exh: Math.round((x.exhibitionShare || 0) * x.races) }]; }));
 const sumStats = (list) => Object.fromEntries(STAT_KEYS.map((k) => [k, list.reduce((t, d) => { const x = d?.[k]; if (x) { t.races += x.races; t.hits += x.hits; t.stake += x.stake; t.ret += x.ret; t.exh += x.exh || 0; } return t; }, { races: 0, hits: 0, stake: 0, ret: 0, exh: 0 })]));
 const view = (x) => ({ ...x, hitRate: x.races ? x.hits / x.races : null, recovery: x.stake ? x.ret / x.stake : null, exhibitionShare: x.races ? x.exh / x.races : null });
 
 // 日ごとの成績(新しい日が上)
-const MODE_COLS = { A: [['A_on', '1着なし'], ['A_off', '1着あり']], B: [['B2', 'B 中穴']], C: [['C2', 'C 万舟']] };
+const MODE_COLS = { A: [['A_on', '1着なし'], ['A_off', '1着あり']], B: [['B3', 'B 中穴'], ['B2', '旧B(逃げ含む)']], C: [['C2', 'C 万舟']] };
 function modeSwitch(m) {
   return `<div class="seg" style="margin:10px 0 6px">${['A', 'B', 'C'].map((k) => `<button data-smode="${k}" class="${m === k ? 'on' : ''}">${k} ${MODES[k].label}</button>`).join('')}</div>`;
 }
@@ -453,7 +453,7 @@ async function autoCard(sel) {
   const c = (x) => (x.races ? `<b>${pct(x.hitRate)}</b> <span class="na">${x.hits}/${x.races}</span><br>回収 <b>${pct(x.recovery, 0)}</b>` : '<span class="na">—</span>');
   const line = (m) => {
     if (m === 'A') return `<tr><td class="l">A ${MODES.A.label}</td><td>${c(view(total.A_on))}</td><td>${c(view(total.A_off))}</td></tr>`;
-    return `<tr><td class="l">${m} ${MODES[m].label}</td><td colspan="2">${c(view(total[`${m}2`]))}</td></tr>`;
+    return `<tr><td class="l">${m} ${MODES[m].label}</td><td colspan="2">${c(view(total[m === 'B' ? 'B3' : 'C2']))}</td></tr>`;
   };
   const sm = getPrefs().statsMode || 'A';
   const cell = (r, k) => { const b = r.bets?.[k]; if (!b) return '<span class="na">—</span>'; if (!r.result?.combo) return '—'; return b.includes(r.result.combo) ? `<b class="pos">◯ ${(r.result.payout || 0).toLocaleString()}円</b>` : '×'; };
@@ -463,7 +463,7 @@ async function autoCard(sel) {
   return `${bar}<div class="card"><h2>${sel ? `${fmtDate(sel)}(${wd(sel)})の成績` : '全期間の成績'}(締切直前の予想)</h2>
     <p class="small">画面を開かなくても、全レースの締切直前の予想を自動で記録しています。展示入りの割合: ${pct(view(total.A_off).exhibitionShare, 0)}</p>
     <div class="tbl-wrap"><table class="t"><thead><tr><th class="l">モード</th><th>1号艇1着<br>なし</th><th>1号艇1着<br>あり</th></tr></thead><tbody>${line('A')}${line('B')}${line('C')}</tbody></table></div>
-    <p class="small muted">各買い目100円。B(オッズ100倍未満)・C(100倍以上の万舟)は「1号艇1着なし/あり」で分けず、オッズが取れたレースだけで集計(11月25日夜からの記録)。</p>
+    <p class="small muted">各買い目100円。B(1号艇以外が1着・オッズ100倍未満、11月26日夕方から)・C(100倍以上の万舟、11月25日夜から)はオッズが取れたレースだけで集計。</p>
     <h3>モード別にくわしく</h3>${modeSwitch(sm)}
     ${sel ? '' : `<h3>日ごとの成績</h3>${dayTable(Object.fromEntries(allDates.map((d) => [d, dayStats[d]])), sm)}`}
     ${listNote}${done.length ? `<details><summary class="h2">レースごとの結果(${done.length}件${sel ? '' : '・直近7日'})</summary><div class="tbl-wrap"><table class="t"><thead><tr><th class="l">レース</th><th>結果</th>${MODE_COLS[sm].map(([, l]) => `<th>${l}</th>`).join('')}</tr></thead><tbody>${list}</tbody></table></div></details>` : ''}</div>`;

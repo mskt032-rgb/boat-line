@@ -260,7 +260,7 @@ export function rankCombos(probs) {
 
 export const MODES = {
   A: { label: '的中重視', desc: '当たる確率が高い順に選びます' },
-  B: { label: '中穴狙い', desc: 'オッズ100倍未満の中から、推定確率×オッズ(期待値)が高い順に選びます' },
+  B: { label: '中穴狙い', desc: '1号艇以外が1着の組で、オッズ100倍未満の中から、推定確率×オッズ(期待値)が高い順に選びます' },
   C: { label: '万舟狙い', desc: 'オッズ100倍以上の中から、期待値が高い順に選びます' },
 };
 
@@ -291,6 +291,7 @@ export function selectBets(pred, odds, opt = {}) {
     if (!hasOdds) return { bets: [], warnings: [...warnings, 'オッズがまだ取得できていないため、このモードは計算できません。オッズは締切の約25分前から取得します。'], available: false };
     let pool = cands.filter((c) => c.odds != null && c.p >= 0.003);
     pool = mode === 'C' ? pool.filter((c) => c.odds >= 100) : pool.filter((c) => c.odds < 100);
+    if (mode === 'B' && !opt.includeBoat1First) pool = pool.filter((c) => !c.combo.startsWith('1-')); // 中穴は1号艇以外が1着
     pool.sort((a, b) => b.ev - a.ev);
     // 期待値1倍以上の組を優先し、6点に足りなければ期待値の高い順に足す(最低6点・最大12点)
     const MIN_POINTS = Math.min(6, maxPoints);

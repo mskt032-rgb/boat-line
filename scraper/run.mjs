@@ -16,7 +16,7 @@ import { summarizeAutolog } from '../app/js/verify.js';
 export const BASE = 'https://www.boatrace.jp';
 export const UA = 'BOAT-LINE-personal/1.0 (personal non-commercial use; +https://github.com/mskt032-rgb/boat-line)';
 const KEEP_DAYS = 45; // アプリで1レースずつ見られる期間。これより古い日は圧縮して archive ブランチへ(1年以上残す)
-export const STAT_KEYS = ['A_on', 'A_off', 'B2', 'C2'];
+export const STAT_KEYS = ['A_on', 'A_off', 'B2', 'B3', 'C2'];
 
 const PATHS = {
   index: (d) => `/owpc/pc/race/index?hd=${d}`,

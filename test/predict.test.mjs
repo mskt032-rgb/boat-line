@@ -161,3 +161,12 @@ test('B・Cは最低6点(期待値1倍以上が少なければ期待値の高い
   const c = selectBets(p, flatOdds(500), { mode: 'C' });
   assert.ok(c.bets.length >= 6 && c.bets.length <= 12);
 });
+
+test('B 中穴狙いは1号艇以外が1着の組だけ(比較用に includeBoat1First で旧ルールも出せる)', () => {
+  const p = predictRace(makeRace());
+  const odds = flatOdds(60);
+  const b = selectBets(p, odds, { mode: 'B' });
+  assert.ok(b.bets.length >= 6 && b.bets.every((x) => !x.combo.startsWith('1-')));
+  const old = selectBets(p, odds, { mode: 'B', includeBoat1First: true });
+  assert.ok(old.bets.some((x) => x.combo.startsWith('1-')));
+});
