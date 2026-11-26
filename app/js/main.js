@@ -443,8 +443,10 @@ async function autoCard(sel) {
   for (const [d, rows] of Object.entries(rowsByDay)) dayStats[d] = statOfRows(rows); // 読み込めた日は最新の記録で数える
   const allDates = Object.keys(dayStats).filter((d) => STAT_KEYS.some((k) => dayStats[d]?.[k]?.races || rowsByDay[d]?.length)).sort().reverse();
   if (sel && !allDates.includes(sel) && rowsByDay[sel]) allDates.unshift(sel);
+  // 日付ボタンは、結果がまだ無い日(今日の朝など)も直近の日なら並べる
+  const barDates = [...new Set([...recent.slice(0, 7), ...allDates])].sort().reverse();
   const today = jstDate();
-  const bar = `<div class="datebar"><a href="#/stats" class="${sel ? '' : 'on'}">全期間</a>${allDates.slice(0, 14).map((d) => `<a href="#/stats/${d}" class="${d === sel ? 'on' : ''}">${d === today ? '今日' : `${fmtDate(d)}(${wd(d)})`}</a>`).join('')}</div>`;
+  const bar = `<div class="datebar"><a href="#/stats" class="${sel ? '' : 'on'}">全期間</a>${barDates.slice(0, 14).map((d) => `<a href="#/stats/${d}" class="${d === sel ? 'on' : ''}">${d === today ? '今日' : `${fmtDate(d)}(${wd(d)})`}</a>`).join('')}</div>`;
   const total = sumStats(sel ? [dayStats[sel]] : allDates.map((d) => dayStats[d]));
   const rows = sel ? (rowsByDay[sel] || []) : Object.values(rowsByDay).flat();
   if (!total.A_on.races && !total.A_off.races && !rows.length) return bar + '<div class="card"><h2>全レース自動記録</h2><p class="small muted">まだ結果の出た記録がありません。締切前のレースから順に、自動で記録していきます。</p></div>';
