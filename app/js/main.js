@@ -188,7 +188,8 @@ async function viewVenue(date, jcd, fresh) {
       const ab = race.auto?.bets || {};
       const hitL = [['A_on', 'Aなし'], ['A_off', 'Aあり'], ['B3', 'B'], ['C2', 'C']].filter(([k]) => ab[k]?.includes(res)).map(([, l]) => l);
       const marks = race.auto ? (hitL.length ? `<span class="chip ok">◯ ${hitL.join('・')}</span>` : '<span class="chip">外れ</span>') : '';
-      resultHtml = `<span class="chip">結果 ${res}</span>${marks}`;
+      const pay = race.result.data.trifecta.payout;
+      resultHtml = `<span class="chip">結果 ${res}${pay ? ` ${pay.toLocaleString()}円` : ''}</span>${marks}`;
     }
     items.push(`<li><a href="#/r/${date}/${jcd}/${r}"><span class="rno">${r}R</span><span class="dl">${esc(race.deadline || '--:--')}</span>
       <span class="chips">${resultHtml ? resultHtml : (dl && dl < now
@@ -458,7 +459,7 @@ async function autoCard(sel) {
   const sm = getPrefs().statsMode || 'A';
   const cell = (r, k) => { const b = r.bets?.[k]; if (!b) return '<span class="na">—</span>'; if (!r.result?.combo) return '—'; return b.includes(r.result.combo) ? `<b class="pos">◯ ${(r.result.payout || 0).toLocaleString()}円</b>` : '×'; };
   const done = rows.filter((r) => r.result?.combo).sort((x, y) => (y.date + y.deadline).localeCompare(x.date + x.deadline));
-  const list = done.map((r) => `<tr><td class="l"><a href="#/r/${r.date}/${r.jcd}/${r.rno}">${+r.date.slice(6)}日 ${esc(VENUE_NAME[r.jcd])}${r.rno}R</a>${r.reflect?.exhibition ? '' : '<br><span class="na">展示なし</span>'}</td><td>${combo(r.result.combo, true)}</td>${MODE_COLS[sm].map(([k]) => `<td>${cell(r, k)}</td>`).join('')}</tr>`).join('');
+  const list = done.map((r) => `<tr><td class="l"><a href="#/r/${r.date}/${r.jcd}/${r.rno}">${+r.date.slice(6)}日 ${esc(VENUE_NAME[r.jcd])}${r.rno}R</a>${r.reflect?.exhibition ? '' : '<br><span class="na">展示なし</span>'}</td><td>${combo(r.result.combo, true)}<br><span class="small">${r.result.payout ? r.result.payout.toLocaleString() + '円' : ''}</span></td>${MODE_COLS[sm].map(([k]) => `<td>${cell(r, k)}</td>`).join('')}</tr>`).join('');
   const listNote = sel ? (recent.includes(sel) ? '' : '<p class="small muted">45日より前の日は、レースごとの結果をアプリでは表示しません(記録は保管しています)。</p>') : '';
   return `${bar}<div class="card"><h2>${sel ? `${fmtDate(sel)}(${wd(sel)})の成績` : '全期間の成績'}(締切直前の予想)</h2>
     <p class="small">画面を開かなくても、全レースの締切直前の予想を自動で記録しています。展示入りの割合: ${pct(view(total.A_off).exhibitionShare, 0)}</p>
