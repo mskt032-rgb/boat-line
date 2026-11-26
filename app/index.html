@@ -12,7 +12,7 @@
 <link rel="icon" href="icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="icon-180.png">
 <link rel="manifest" href="manifest.webmanifest">
-<link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="style.css" id="css">
 </head>
 <body>
 <header class="top">
@@ -26,6 +26,17 @@
   <a href="#/stats" data-tab="stats">成績</a>
   <a href="#/settings" data-tab="settings">保存・情報</a>
 </nav>
-<script type="module" src="js/main.js"></script>
+<script>
+// 入口のページがiPhoneに残っていても、毎回いちばん新しい版の部品を読み込む
+(function () {
+  function load(v) {
+    var q = v ? '?v=' + encodeURIComponent(v) : '';
+    document.getElementById('css').href = 'style.css' + q;
+    var s = document.createElement('script'); s.type = 'module'; s.src = 'js/main.js' + q; document.body.appendChild(s);
+  }
+  fetch('version.json?t=' + Date.now(), { cache: 'no-store' }).then(function (r) { return r.ok ? r.json() : {}; })
+    .then(function (j) { load(j.v || ''); }).catch(function () { load(''); });
+})();
+</script>
 </body>
 </html>
