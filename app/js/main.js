@@ -419,21 +419,18 @@ const sumStats = (list) => Object.fromEntries(STAT_KEYS.map((k) => [k, list.redu
 const view = (x) => ({ ...x, hitRate: x.races ? x.hits / x.races : null, recovery: x.stake ? x.ret / x.stake : null, exhibitionShare: x.races ? x.exh / x.races : null });
 
 // 日ごとの成績(新しい日が上)
-const MODE_COLS = { A: [['A_on', '1着なし'], ['A_off', '1着あり']], B: [['B3', 'B 中穴'], ['B2', '旧B(逃げ含む)']], C: [['C2', 'C 万舟']] };
-function modeSwitch(m) {
-  return `<div class="seg" style="margin:10px 0 6px">${['A', 'B', 'C'].map((k) => `<button data-smode="${k}" class="${m === k ? 'on' : ''}">${k} ${MODES[k].label}</button>`).join('')}</div>`;
-}
-function dayTable(dayStats, m) {
-  const cols = MODE_COLS[m];
-  const c = (x) => (x.races ? `${pct(x.hitRate, 0)} <span class="na">${x.hits}/${x.races}</span><br><span class="na">回収</span> <b>${pct(x.recovery, 0)}</b>` : '<span class="na">—</span>');
+const ALL_COLS = [['A_on', 'A<br>なし'], ['A_off', 'A<br>あり'], ['B3', 'B<br>中穴'], ['C2', 'C<br>万舟']];
+function dayTable(dayStats) {
+  const c = (x) => (x.races ? `<b>${pct(x.recovery, 0)}</b><br><span class="na">${x.hits}/${x.races}</span>` : '<span class="na">—</span>');
   const body = Object.keys(dayStats).sort().reverse().map((d) => {
     const st = dayStats[d]; if (!st) return '';
-    const vs = cols.map(([k]) => view(st[k] || { races: 0, hits: 0, stake: 0, ret: 0, exh: 0 }));
+    const vs = ALL_COLS.map(([k]) => view(st[k] || { races: 0, hits: 0, stake: 0, ret: 0, exh: 0 }));
     if (!vs.some((x) => x.races)) return '';
-    return `<tr><td class="l"><a href="#/stats/${d}">${fmtDate(d)}</a></td>${vs.map((x) => `<td>${c(x)}</td>`).join('')}</tr>`;
+    return `<tr><td class="l"><a href="#/stats/${d}">${+d.slice(4, 6)}/${+d.slice(6)}</a></td>${vs.map((x) => `<td>${c(x)}</td>`).join('')}</tr>`;
   }).join('');
-  if (!body) return '<p class="small muted">このモードの記録はまだありません。</p>';
-  return `<div class="tbl-wrap"><table class="t"><thead><tr><th class="l">日付</th>${cols.map(([, l]) => `<th>${l}</th>`).join('')}</tr></thead><tbody>${body}</tbody></table></div>`;
+  if (!body) return '';
+  return `<div class="tbl-wrap"><table class="t"><thead><tr><th class="l">日付</th>${ALL_COLS.map(([, l]) => `<th>${l}</th>`).join('')}</tr></thead><tbody>${body}</tbody></table></div>
+    <p class="small muted">上が回収率、下が的中数/レース数。日付を押すとその日の成績に切り替わります。</p>`;
 }
 
 async function autoCard(sel) {
@@ -456,25 +453,24 @@ async function autoCard(sel) {
     if (m === 'A') return `<tr><td class="l">A ${MODES.A.label}</td><td>${c(view(total.A_on))}</td><td>${c(view(total.A_off))}</td></tr>`;
     return `<tr><td class="l">${m} ${MODES[m].label}</td><td colspan="2">${c(view(total[m === 'B' ? 'B3' : 'C2']))}</td></tr>`;
   };
-  const sm = getPrefs().statsMode || 'A';
-  const cell = (r, k) => { const b = r.bets?.[k]; if (!b) return '<span class="na">—</span>'; if (!r.result?.combo) return '—'; return b.includes(r.result.combo) ? '<b class="pos">◯ 的中</b>' : '<span class="na">×</span>'; };
+  const cell = (r, k) => { const b = r.bets?.[k]; if (!b) return '<span class="na">—</span>'; return b.includes(r.result.combo) ? '<b class="pos">◯</b>' : '<span class="na">×</span>'; };
   const allDone = rows.filter((r) => r.result?.combo).sort((x, y) => (y.date + y.deadline).localeCompare(x.date + x.deadline));
-  // Cを選んだときは「万舟が出たレース」と「Cで当てたレース」を切り替えて見られる
-  const cView = getPrefs().cView || 'man';
   const isMan = (r) => (r.result?.payout || 0) >= 10000;
-  const done = sm === 'C' ? allDone.filter((r) => (cView === 'man' ? isMan(r) : r.bets?.C2?.includes(r.result.combo))) : allDone;
+  const anyHit = (r) => ALL_COLS.some(([k]) => r.bets?.[k]?.includes(r.result.combo));
+  const lv = getPrefs().listView || 'all';
+  const done = lv === 'man' ? allDone.filter(isMan) : lv === 'hit' ? allDone.filter(anyHit) : allDone;
   const manAll = allDone.filter(isMan), manHit = manAll.filter((r) => r.bets?.C2?.includes(r.result.combo));
-  const cHead = sm === 'C' ? `<p class="small" style="margin:6px 0">万舟(払戻1万円以上)は <b>${manAll.length}本</b> 出て、そのうちCで的中 <b>${manHit.length}本</b>${sel ? '' : '(直近7日)'}</p>
-    <div class="seg" style="margin:4px 0 8px"><button data-cview="man" class="${cView === 'man' ? 'on' : ''}">万舟が出たレース</button><button data-cview="hit" class="${cView === 'hit' ? 'on' : ''}">Cで当てたレース</button></div>` : '';
-  const list = done.map((r) => `<tr><td class="l"><a href="#/r/${r.date}/${r.jcd}/${r.rno}">${+r.date.slice(6)}日 ${esc(VENUE_NAME[r.jcd])}${r.rno}R</a>${r.reflect?.exhibition ? '' : '<br><span class="na">展示なし</span>'}</td><td>${combo(r.result.combo, true)}<br><span class="na">${r.result.payout ? '払戻 ' + r.result.payout.toLocaleString() + '円' : ''}</span></td>${MODE_COLS[sm].map(([k]) => `<td>${cell(r, k)}</td>`).join('')}</tr>`).join('');
+  const filters = `<p class="small" style="margin:6px 0">万舟(払戻1万円以上)は <b>${manAll.length}本</b>、そのうちCで的中 <b>${manHit.length}本</b>${sel ? '' : '(直近7日)'}</p>
+    <div class="seg" style="margin:4px 0 8px">${[['all', 'すべて'], ['hit', 'どれか的中'], ['man', '万舟だけ']].map(([k, l]) => `<button data-lview="${k}" class="${lv === k ? 'on' : ''}">${l}</button>`).join('')}</div>`;
+  const list = done.map((r) => `<tr><td class="l"><a href="#/r/${r.date}/${r.jcd}/${r.rno}">${+r.date.slice(6)}日 ${esc(VENUE_NAME[r.jcd])}${r.rno}R</a></td><td>${combo(r.result.combo, true)}<br><span class="na">${r.result.payout ? r.result.payout.toLocaleString() + '円' : ''}</span></td>${ALL_COLS.map(([k]) => `<td>${cell(r, k)}</td>`).join('')}</tr>`).join('');
   const listNote = sel ? (recent.includes(sel) ? '' : '<p class="small muted">45日より前の日は、レースごとの結果をアプリでは表示しません(記録は保管しています)。</p>') : '';
   return `${bar}<div class="card"><h2>${sel ? `${fmtDate(sel)}(${wd(sel)})の成績` : '全期間の成績'}(締切直前の予想)</h2>
     <p class="small">画面を開かなくても、全レースの締切直前の予想を自動で記録しています。展示入りの割合: ${pct(view(total.A_off).exhibitionShare, 0)}</p>
     <div class="tbl-wrap"><table class="t"><thead><tr><th class="l">モード</th><th>1号艇1着<br>なし</th><th>1号艇1着<br>あり</th></tr></thead><tbody>${line('A')}${line('B')}<tr><td class="l"><span class="na">旧B(逃げ含む・比較用)</span></td><td colspan="2">${c(view(total.B2))}</td></tr>${line('C')}</tbody></table></div>
     <p class="small muted">各買い目100円。B(1号艇以外が1着・オッズ100倍未満、11月26日夕方から)・C(100倍以上の万舟、11月25日夜から)はオッズが取れたレースだけで集計。</p>
-    <h3>モード別にくわしく</h3>${modeSwitch(sm)}
-    ${sel ? '' : `<h3>日ごとの成績</h3>${dayTable(Object.fromEntries(allDates.map((d) => [d, dayStats[d]])), sm)}`}
-    ${listNote}${cHead}${done.length || sm === 'C' ? `<details ${sm === 'C' ? 'open' : ''}><summary class="h2">${sm === 'C' ? (cView === 'man' ? '万舟が出たレース' : 'Cで当てたレース') : 'レースごとの結果'}(${done.length}件${sel ? '' : '・直近7日'})</summary><div class="tbl-wrap"><table class="t"><thead><tr><th class="l">レース</th><th>結果</th>${MODE_COLS[sm].map(([, l]) => `<th>${l}</th>`).join('')}</tr></thead><tbody>${list}</tbody></table></div></details>` : ''}</div>`;
+    ${sel ? '' : `<h3>日ごとの成績</h3>${dayTable(Object.fromEntries(allDates.map((d) => [d, dayStats[d]])))}`}
+    ${listNote}<h3>レースごとの結果(${done.length}件${sel ? '' : '・直近7日'})</h3>${filters}
+    ${done.length ? `<div class="tbl-wrap"><table class="t"><thead><tr><th class="l">レース</th><th>結果</th>${ALL_COLS.map(([, l]) => `<th>${l}</th>`).join('')}</tr></thead><tbody>${list}</tbody></table></div>` : '<p class="small muted">該当するレースはありません。</p>'}</div>`;
 }
 
 async function viewStats(sel) {
@@ -482,8 +478,7 @@ async function viewStats(sel) {
   clearInterval(refreshTimer);
   const autoHtml = await autoCard(sel);
   setTimeout(() => {
-    app.querySelectorAll('[data-smode]').forEach((b) => b.addEventListener('click', () => { setPrefs({ statsMode: b.dataset.smode }); viewStats(sel); }));
-    app.querySelectorAll('[data-cview]').forEach((b) => b.addEventListener('click', () => { setPrefs({ cView: b.dataset.cview }); viewStats(sel); }));
+    app.querySelectorAll('[data-lview]').forEach((b) => b.addEventListener('click', () => { setPrefs({ listView: b.dataset.lview }); viewStats(sel); }));
   }, 0);
   // 成績は全レース自動記録の1つにまとめる(この端末で開いたレースの記録は保存は続けるが、紛らわしいので表示しない)
   app.innerHTML = '<h1>成績</h1>' + autoHtml;
