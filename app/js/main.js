@@ -462,7 +462,7 @@ async function autoCard(sel) {
   const listNote = sel ? (recent.includes(sel) ? '' : '<p class="small muted">45日より前の日は、レースごとの結果をアプリでは表示しません(記録は保管しています)。</p>') : '';
   return `${bar}<div class="card"><h2>${sel ? `${fmtDate(sel)}(${wd(sel)})の成績` : '全期間の成績'}(締切直前の予想)</h2>
     <p class="small">画面を開かなくても、全レースの締切直前の予想を自動で記録しています。展示入りの割合: ${pct(view(total.A_off).exhibitionShare, 0)}</p>
-    <div class="tbl-wrap"><table class="t"><thead><tr><th class="l">モード</th><th>1号艇1着<br>なし</th><th>1号艇1着<br>あり</th></tr></thead><tbody>${line('A')}${line('B')}${line('C')}</tbody></table></div>
+    <div class="tbl-wrap"><table class="t"><thead><tr><th class="l">モード</th><th>1号艇1着<br>なし</th><th>1号艇1着<br>あり</th></tr></thead><tbody>${line('A')}${line('B')}<tr><td class="l"><span class="na">旧B(逃げ含む・比較用)</span></td><td colspan="2">${c(view(total.B2))}</td></tr>${line('C')}</tbody></table></div>
     <p class="small muted">各買い目100円。B(1号艇以外が1着・オッズ100倍未満、11月26日夕方から)・C(100倍以上の万舟、11月25日夜から)はオッズが取れたレースだけで集計。</p>
     <h3>モード別にくわしく</h3>${modeSwitch(sm)}
     ${sel ? '' : `<h3>日ごとの成績</h3>${dayTable(Object.fromEntries(allDates.map((d) => [d, dayStats[d]])), sm)}`}
