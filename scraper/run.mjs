@@ -259,7 +259,7 @@ export async function runOnce({
   } catch (e) { runLog.errors.push(`予想の自動記録: ${e.message}`); }
   saveAll();
 
-  // 展示の見張り: 締切15分前を過ぎても展示が取れていないレースだけ、約1分半おきに取り直す
+  // 締切前の見張り: (1) 締切15分前を過ぎても展示が取れていないレースは展示を、(2) 締切5分前を過ぎたレースはオッズを、約1分半おきに取り直す
   if (watchUntilMs && !runLog.stopped?.includes('応答コード') && robots) {
     reqCap = runLog.requests + watchMaxRequests;
     timeEnd = watchUntilMs;
@@ -277,6 +277,34 @@ export async function runOnce({
             if (race.before?.attemptedAt && nowW - Date.parse(race.before.attemptedAt) < 90000) continue;
             targets.push({ jcd, vdoc, race, dl });
           }
+        }
+        // (2) 締切5分前〜30秒前のレースのオッズを取り直す(締切にできるだけ近いオッズで期待値を計算するため)
+        const oddsTargets = [];
+        for (const [jcd, vdoc] of Object.entries(venueDocs[today] || {})) {
+          for (const race of Object.values(vdoc.races || {})) {
+            const dl = deadlineMs(today, race.deadline);
+            if (dl == null || race.racelist?.status !== 'ok' || vdoc.canceled) continue;
+            const left = dl - nowW;
+            if (left <= 30000 || left > 5 * 60000) continue;
+            if (race.odds?.attemptedAt && nowW - Date.parse(race.odds.attemptedAt) < 90000) continue;
+            if (targets.some((t) => t.race === race)) continue;
+            oddsTargets.push({ jcd, vdoc, race, dl });
+          }
+        }
+        oddsTargets.sort((a, b) => a.dl - b.dl);
+        for (const { jcd, vdoc, race, dl } of oddsTargets) {
+          const po = PATHS.odds3t(today, jcd, race.rno);
+          try {
+            const o = parseOdds3t(await get(po));
+            if (o.odds && clock() < dl) race.odds = { ...(race.odds || {}), attemptedAt: isoNow(clock()), source: BASE + po, status: 'ok', fetchedAt: isoNow(clock()), data: { odds: o.odds, oddsTime: o.oddsTime, final: o.final }, error: null };
+            else race.odds = { ...(race.odds || {}), attemptedAt: isoNow(clock()) };
+            runLog.lateOdds = (runLog.lateOdds || 0) + 1;
+          } catch (e) {
+            if (e instanceof StopRun) throw e;
+            race.odds = { ...(race.odds || {}), attemptedAt: isoNow(clock()), error: e.message };
+          }
+          if (recordAutoPredictions(vdoc, today, clock(), (t) => readJson(path.join(store, 'racers', `${t}.json`), null))) markDirty(today, jcd);
+          markDirty(today, jcd);
         }
         targets.sort((a, b) => a.dl - b.dl);
         for (const { jcd, vdoc, race } of targets) {

@@ -216,3 +216,26 @@ test('45日より古い日は圧縮して保管場所へ移し、日ごとの集
   assert.ok(bundle.files['autolog.json'].rows.length > 0);
   assert.ok(read(store, 'stats-days.json').days[D].A_off.races >= 1, '集計は消えない');
 });
+
+test('締切5分前を過ぎたレースは、オッズを短い間隔で取り直し、締切前の最新オッズで記録する', async () => {
+  const store = tmp();
+  let t = deadlineMs(D, '07:00');
+  const clock = () => t;
+  let oddsVal = '10.0';
+  const base = fakeSite();
+  const fetchText = async (url) => (url.includes('/odds3t') ? { status: 200, text: oddsHtml(() => oddsVal) } : base.fetchText(url));
+  const o = (now, extra = {}) => ({ store, now, fetchText, intervalMs: 0, clock, sleep: async (ms) => { t += ms; }, ...extra });
+  await runOnce(o(t));
+  t = deadlineMs(D, '10:20');
+  await runOnce(o(t));
+  let v = read(store, `${D}/02.json`);
+  assert.equal(v.races[1].odds.data.odds['1-2-3'], 10);
+  // 10:24 開始、見張りは 10:30 締切の直前まで。途中でオッズが 20 倍に変わる
+  t = deadlineMs(D, '10:24');
+  oddsVal = '20.0';
+  await runOnce(o(t, { watchUntilMs: deadlineMs(D, '10:30') }));
+  v = read(store, `${D}/02.json`);
+  assert.equal(v.races[1].odds.data.odds['1-2-3'], 20);
+  assert.ok(Date.parse(v.races[1].odds.fetchedAt) >= deadlineMs(D, '10:25'));
+  assert.ok(Date.parse(v.races[1].odds.fetchedAt) < deadlineMs(D, '10:30'));
+});
