@@ -218,3 +218,21 @@ test('45日より古い日は圧縮して保管場所へ移し、日ごとの集
   assert.ok(read(store, 'stats-days.json').days[D].A_off.races >= 1, '集計は消えない');
 });
 
+
+test('締切が変わったら、直前情報のページの締切時刻で更新する', async () => {
+  const store = tmp();
+  const base = fakeSite();
+  let changed = false;
+  const fetchText = async (url) => {
+    const r = await base.fetchText(url);
+    if (changed && url.includes('/beforeinfo')) return { status: 200, text: r.text.replace('<td>10:30</td>', '<td>10:36</td>') };
+    return r;
+  };
+  const o = (now) => ({ store, now, fetchText, intervalMs: 0, sleep: async () => {}, clock: () => now });
+  await runOnce(o(deadlineMs(D, '07:00')));
+  changed = true;
+  await runOnce(o(deadlineMs(D, '10:15')));
+  const v = read(store, `${D}/02.json`);
+  assert.equal(v.races[1].deadline, '10:36');
+  assert.equal(v.races[1].deadlineChangedFrom, '10:30');
+});

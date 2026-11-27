@@ -229,7 +229,7 @@ async function viewRace(date, jcd, rno, fresh) {
   const nextLink = rno < 12 ? `<a href="#/r/${date}/${jcd}/${rno + 1}">${rno + 1}R ›</a>` : '<span></span>';
   let html = `<div class="row between"><a class="back" href="#/v/${date}/${jcd}">‹ ${esc(name)}のレース一覧</a></div>
     <div class="row between"><h1 style="margin:0">${esc(name)} ${rno}R</h1><div class="row small">${prevLink}　${nextLink}</div></div>
-    <p class="muted" style="margin:2px 0 10px">${fmtDate(date)} 締切 ${esc(race?.deadline || '未取得')}${left != null ? (left > 0 ? `(あと${left}分)` : '(締切済み)') : ''}
+    <p class="muted" style="margin:2px 0 10px">${fmtDate(date)} 締切 ${esc(race?.deadline || '未取得')}${race?.deadlineChangedFrom ? `(変更 ${esc(race.deadlineChangedFrom)}→)` : ''}${left != null ? (left > 0 ? `(あと${left}分)` : '(締切済み)') : ''}
     ${race?.racelist?.data?.raceTitle ? ' / ' + esc(race.racelist.data.raceTitle) : ''}</p>${race && raceHint(race) ? `<p style="margin:-4px 0 10px">${raceHint(race)}</p>` : ''}`;
   if (!race) {
     app.innerHTML = html + '<div class="card">このレースのデータはまだありません。</div>';

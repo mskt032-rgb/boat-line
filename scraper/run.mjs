@@ -38,6 +38,20 @@ function writeJson(file, obj) {
 
 class StopRun extends Error {}
 
+/** 直前情報などのページに載っている最新の締切時刻で、その場の全レースの締切を更新する(締切変更に追いつくため) */
+export function applyDeadlines(vdoc, deadlines) {
+  if (!deadlines) return false;
+  let changed = false;
+  for (const [rn, tm] of Object.entries(deadlines)) {
+    const race = (vdoc.races[rn] ||= { rno: +rn, deadline: null });
+    if (tm && race.deadline !== tm) {
+      if (race.deadline) race.deadlineChangedFrom = race.deadline;
+      race.deadline = tm; changed = true;
+    }
+  }
+  return changed;
+}
+
 export async function defaultFetchText(url) {
   const res = await fetch(url, { headers: { 'User-Agent': UA, 'Accept-Language': 'ja' }, signal: AbortSignal.timeout(25000), redirect: 'follow' });
   const text = await res.text();
@@ -184,6 +198,7 @@ export async function runOnce({
             if (r.deadlines) for (const [rn, tm] of Object.entries(r.deadlines)) { (vdoc.races[rn] ||= { rno: +rn, deadline: null }).deadline = tm; }
           } else if (t.type === 'beforeinfo') {
             const r = parseBeforeinfo(html);
+            applyDeadlines(vdoc, r.deadlines);
             if (r.hasExhibition || r.weather) Object.assign(rec, { status: r.hasExhibition ? 'ok' : 'pending', fetchedAt: isoNow(clock()), data: { boats: r.boats, start: r.start, weather: r.weather } });
             else rec.status = prev.status === 'ok' ? 'ok' : 'pending';
             rec.warnings = r.warnings; rec.error = null;
@@ -286,6 +301,7 @@ export async function runOnce({
           const rec = { ...prev, attemptedAt: isoNow(clock()), source: BASE + p };
           try {
             const r = parseBeforeinfo(await get(p));
+            applyDeadlines(vdoc, r.deadlines);
             if (r.hasExhibition) Object.assign(rec, { status: 'ok', fetchedAt: isoNow(clock()), data: { boats: r.boats, start: r.start, weather: r.weather }, error: null });
             else rec.status = prev.status || 'pending';
             race.before = rec;
