@@ -21,9 +21,11 @@ export function recordAutoPredictions(vdoc, date, nowMs, getRacer = () => null) 
     const bets = {};
     for (const [k, ex] of [['on', true], ['off', false]]) bets[`A_${k}`] = selectBets(pred, odds, { mode: 'A', excludeBoat1First: ex }).bets.map((b) => b.combo);
     // B(100倍未満)・C(万舟 100倍以上)は「1号艇1着なし/あり」で分けない。古い記録の B_on 等とは別の名前で残す
-    for (const m of ['B', 'C']) { const r = selectBets(pred, odds, { mode: m, includeBoat1First: true }); bets[`${m}2`] = r.available ? r.bets.map((b) => b.combo) : null; }
+    for (const m of ['B', 'C']) { const r = selectBets(pred, odds, { mode: m, includeBoat1First: true, oldC: true }); bets[`${m}2`] = r.available ? r.bets.map((b) => b.combo) : null; }
     // B3: 中穴(1号艇以外が1着・100倍未満)。B2(1号艇1着も含む旧ルール)は比較用に残す
     { const r = selectBets(pred, odds, { mode: 'B' }); bets.B3 = r.available ? r.bets.map((b) => b.combo) : null; }
+    // C3: 万舟(同じ艇が1着の組は2点まで)。C2(偏りあり)は比較用に残す
+    { const r = selectBets(pred, odds, { mode: 'C' }); bets.C3 = r.available ? r.bets.map((b) => b.combo) : null; }
     race.auto = {
       savedAt: new Date(nowMs).toISOString(), stamp, modelVersion: pred.modelVersion,
       reflect: { exhibition: pred.reflect.exhibition, course: pred.reflect.course, odds: pred.reflect.odds, konsetsu: pred.reflect.konsetsu, courseStats: pred.reflect.courseStats },

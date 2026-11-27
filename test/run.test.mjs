@@ -144,6 +144,7 @@ test('全レース自動記録: 締切前に記録し、締切後は書き換え
   assert.equal(before.reflect.exhibition, true, '展示が入った予想に更新される');
   assert.ok(before.bets.A_on.length > 0 && before.bets.A_off.length > 0 && Array.isArray(before.bets.B2) && Array.isArray(before.bets.B3) && Array.isArray(before.bets.C2));
   assert.ok(before.bets.B3.every((c) => !c.startsWith('1-')));
+  assert.ok(Array.isArray(before.bets.C3));
   await runOnce(opts(store, site, deadlineMs(D, '10:45')));
   v = read(store, `${D}/02.json`);
   assert.deepEqual(v.races[1].auto, before, '締切後は書き換えない');

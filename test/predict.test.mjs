@@ -170,3 +170,17 @@ test('B 中穴狙いは1号艇以外が1着の組だけ(比較用に includeBoat
   const old = selectBets(p, odds, { mode: 'B', includeBoat1First: true });
   assert.ok(old.bets.some((x) => x.combo.startsWith('1-')));
 });
+
+test('C 万舟狙いは同じ艇が1着の組を2点まで(oldC で旧ルール)', () => {
+  const p = predictRace(makeRace({ nat: [4, 4, 4, 4, 4, 7.5] }));
+  const odds = flatOdds(300);
+  const c = selectBets(p, odds, { mode: 'C' });
+  const heads = {};
+  for (const b of c.bets) heads[b.combo[0]] = (heads[b.combo[0]] || 0) + 1;
+  assert.ok(Object.values(heads).every((n) => n <= 2));
+  assert.ok(Object.keys(heads).length >= 3);
+  const old = selectBets(p, odds, { mode: 'C', oldC: true });
+  const oh = {};
+  for (const b of old.bets) oh[b.combo[0]] = (oh[b.combo[0]] || 0) + 1;
+  assert.ok(Math.max(...Object.values(oh)) > 2, '旧ルールは同じ艇の1着が3点以上になりうる');
+});
