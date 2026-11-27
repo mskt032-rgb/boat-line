@@ -421,7 +421,7 @@ const view = (x) => ({ ...x, hitRate: x.races ? x.hits / x.races : null, recover
 // 日ごとの成績(新しい日が上)
 const ALL_COLS = [['A_on', 'A<br>なし'], ['A_off', 'A<br>あり'], ['B3', 'B<br>中穴'], ['B2', '旧<br>B'], ['C3', 'C<br>万舟'], ['C2', '旧<br>C']];
 function dayTable(dayStats) {
-  const c = (x) => (x.races ? `<b>${pct(x.recovery, 0)}</b><br><span class="na">${x.hits}/${x.races}</span>` : '<span class="na">—</span>');
+  const c = (x) => (x.races ? `<span class="na">的中</span> <b>${pct(x.hitRate, 0)}</b><br><span class="na">回収</span> ${pct(x.recovery, 0)}` : '<span class="na">—</span>');
   const body = Object.keys(dayStats).sort().reverse().map((d) => {
     const st = dayStats[d]; if (!st) return '';
     const vs = ALL_COLS.map(([k]) => view(st[k] || { races: 0, hits: 0, stake: 0, ret: 0, exh: 0 }));
@@ -430,7 +430,7 @@ function dayTable(dayStats) {
   }).join('');
   if (!body) return '';
   return `<div class="tbl-wrap stats-wide"><table class="t"><thead><tr><th class="l">日付</th>${ALL_COLS.map(([, l]) => `<th>${l}</th>`).join('')}</tr></thead><tbody>${body}</tbody></table></div>
-    <p class="small muted">上が回収率、下が的中数/レース数。日付を押すとその日の成績に切り替わります。</p>`;
+    <p class="small muted">日付を押すとその日の成績に切り替わります。</p>`;
 }
 
 async function autoCard(sel) {
@@ -450,7 +450,7 @@ async function autoCard(sel) {
   const total = sumStats(sel ? [dayStats[sel]] : allDates.map((d) => dayStats[d]));
   const rows = sel ? (rowsByDay[sel] || []) : Object.values(rowsByDay).flat();
   if (!total.A_on.races && !total.A_off.races && !rows.length) return bar + '<div class="card"><h2>全レース自動記録</h2><p class="small muted">まだ結果の出た記録がありません。締切前のレースから順に、自動で記録していきます。</p></div>';
-  const c = (x) => (x.races ? `<b>${pct(x.hitRate)}</b> <span class="na">${x.hits}/${x.races}</span><br>回収 <b>${pct(x.recovery, 0)}</b>` : '<span class="na">—</span>');
+  const c = (x) => (x.races ? `<span class="na">的中率</span> <b>${pct(x.hitRate)}</b><br><span class="na">${x.hits}/${x.races}レース</span><br><span class="na">回収率</span> <b>${pct(x.recovery, 0)}</b>` : '<span class="na">—</span>');
   const line = (m) => {
     if (m === 'A') return `<tr><td class="l">A ${MODES.A.label}</td><td>${c(view(total.A_on))}</td><td>${c(view(total.A_off))}</td></tr>`;
     return `<tr><td class="l">${m} ${MODES[m].label}</td><td colspan="2">${c(view(total[m === 'B' ? 'B3' : 'C3']))}</td></tr>`;
