@@ -259,7 +259,8 @@ export async function runOnce({
   } catch (e) { runLog.errors.push(`予想の自動記録: ${e.message}`); }
   saveAll();
 
-  // 見張り: (1) 締切15分前を過ぎても展示が取れていないレースは展示を、(2) 締切5分前を過ぎたレースはオッズを、(3) 締切6分後を過ぎて結果がまだのレースは結果を、約1分半おきに取りにいく
+  // 展示の見張り: 締切15分前を過ぎても展示が取れていないレースだけ、約1分半おきに取り直す
+  // (締切前オッズの取り直し・結果の早取りは、11/27に公式サイトから403が返ったため取りやめ)
   if (watchUntilMs && !runLog.stopped?.includes('応答コード') && robots) {
     reqCap = runLog.requests + watchMaxRequests;
     timeEnd = watchUntilMs;
@@ -276,59 +277,6 @@ export async function runOnce({
             if (left <= 60000 || left > 15 * 60000) continue;
             if (race.before?.attemptedAt && nowW - Date.parse(race.before.attemptedAt) < 90000) continue;
             targets.push({ jcd, vdoc, race, dl });
-          }
-        }
-        // (2) 締切5分前〜30秒前のレースのオッズを取り直す(締切にできるだけ近いオッズで期待値を計算するため)
-        const oddsTargets = [];
-        for (const [jcd, vdoc] of Object.entries(venueDocs[today] || {})) {
-          for (const race of Object.values(vdoc.races || {})) {
-            const dl = deadlineMs(today, race.deadline);
-            if (dl == null || race.racelist?.status !== 'ok' || vdoc.canceled) continue;
-            const left = dl - nowW;
-            if (left <= 30000 || left > 5 * 60000) continue;
-            if (race.odds?.attemptedAt && nowW - Date.parse(race.odds.attemptedAt) < 90000) continue;
-            if (targets.some((t) => t.race === race)) continue;
-            oddsTargets.push({ jcd, vdoc, race, dl });
-          }
-        }
-        oddsTargets.sort((a, b) => a.dl - b.dl);
-        for (const { jcd, vdoc, race, dl } of oddsTargets) {
-          const po = PATHS.odds3t(today, jcd, race.rno);
-          try {
-            const o = parseOdds3t(await get(po));
-            if (o.odds && clock() < dl) race.odds = { ...(race.odds || {}), attemptedAt: isoNow(clock()), source: BASE + po, status: 'ok', fetchedAt: isoNow(clock()), data: { odds: o.odds, oddsTime: o.oddsTime, final: o.final }, error: null };
-            else race.odds = { ...(race.odds || {}), attemptedAt: isoNow(clock()) };
-            runLog.lateOdds = (runLog.lateOdds || 0) + 1;
-          } catch (e) {
-            if (e instanceof StopRun) throw e;
-            race.odds = { ...(race.odds || {}), attemptedAt: isoNow(clock()), error: e.message };
-          }
-          if (recordAutoPredictions(vdoc, today, clock(), (t) => readJson(path.join(store, 'racers', `${t}.json`), null))) markDirty(today, jcd);
-          markDirty(today, jcd);
-        }
-        // (3) 締切から6分以上たって結果がまだのレースは、結果を取りにいく(アプリへの反映を早めるため)
-        for (const [jcd, vdoc] of Object.entries(venueDocs[today] || {})) {
-          for (const race of Object.values(vdoc.races || {})) {
-            const dl = deadlineMs(today, race.deadline);
-            const r0 = race.result || {};
-            if (dl == null || r0.ready || r0.canceled || (r0.attempts || 0) >= 12) continue;
-            const past = nowW - dl;
-            if (past < 6 * 60000 || past > 90 * 60000) continue;
-            if (r0.attemptedAt && nowW - Date.parse(r0.attemptedAt) < 90000) continue;
-            const p = PATHS.raceresult(today, jcd, race.rno);
-            const rec = { ...r0, attemptedAt: isoNow(clock()), source: BASE + p, attempts: (r0.attempts || 0) + 1 };
-            try {
-              const r = parseResult(await get(p));
-              rec.ready = r.ready; rec.canceled = r.canceled;
-              if (r.ready || r.canceled) Object.assign(rec, { status: 'ok', fetchedAt: isoNow(clock()), data: { order: r.order, trifecta: r.trifecta, kimarite: r.kimarite, start: r.start, refunds: r.refunds }, error: null });
-              else rec.status = 'pending';
-            } catch (e) {
-              if (e instanceof StopRun) throw e;
-              rec.error = e.message;
-            }
-            race.result = rec;
-            runLog.lateResults = (runLog.lateResults || 0) + 1;
-            markDirty(today, jcd);
           }
         }
         targets.sort((a, b) => a.dl - b.dl);
