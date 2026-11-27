@@ -419,7 +419,7 @@ const sumStats = (list) => Object.fromEntries(STAT_KEYS.map((k) => [k, list.redu
 const view = (x) => ({ ...x, hitRate: x.races ? x.hits / x.races : null, recovery: x.stake ? x.ret / x.stake : null, exhibitionShare: x.races ? x.exh / x.races : null });
 
 // 日ごとの成績(新しい日が上)
-const ALL_COLS = [['A_on', 'A<br>なし'], ['A_off', 'A<br>あり'], ['B3', 'B<br>中穴'], ['C3', 'C<br>万舟']];
+const ALL_COLS = [['A_on', 'A<br>なし'], ['A_off', 'A<br>あり'], ['B3', 'B<br>中穴'], ['B2', '旧<br>B'], ['C3', 'C<br>万舟'], ['C2', '旧<br>C']];
 function dayTable(dayStats) {
   const c = (x) => (x.races ? `<b>${pct(x.recovery, 0)}</b><br><span class="na">${x.hits}/${x.races}</span>` : '<span class="na">—</span>');
   const body = Object.keys(dayStats).sort().reverse().map((d) => {
@@ -429,7 +429,7 @@ function dayTable(dayStats) {
     return `<tr><td class="l"><a href="#/stats/${d}">${+d.slice(4, 6)}/${+d.slice(6)}</a></td>${vs.map((x) => `<td>${c(x)}</td>`).join('')}</tr>`;
   }).join('');
   if (!body) return '';
-  return `<div class="tbl-wrap"><table class="t"><thead><tr><th class="l">日付</th>${ALL_COLS.map(([, l]) => `<th>${l}</th>`).join('')}</tr></thead><tbody>${body}</tbody></table></div>
+  return `<div class="tbl-wrap stats-wide"><table class="t"><thead><tr><th class="l">日付</th>${ALL_COLS.map(([, l]) => `<th>${l}</th>`).join('')}</tr></thead><tbody>${body}</tbody></table></div>
     <p class="small muted">上が回収率、下が的中数/レース数。日付を押すとその日の成績に切り替わります。</p>`;
 }
 
@@ -472,7 +472,7 @@ async function autoCard(sel) {
     <p class="small muted">各買い目100円。B(1号艇以外が1着・オッズ100倍未満、11月26日夕方から)・C(100倍以上の万舟、同じ艇の1着は2点まで、11月27日朝から)はオッズが取れたレースだけで集計。</p>
     ${sel ? '' : `<h3>日ごとの成績</h3>${dayTable(Object.fromEntries(allDates.map((d) => [d, dayStats[d]])))}`}
     ${listNote}<h3>レースごとの結果(${done.length}件${sel ? '' : '・直近7日'})</h3>${filters}
-    ${done.length ? `<div class="tbl-wrap"><table class="t"><thead><tr><th class="l">レース</th><th>結果</th>${ALL_COLS.map(([, l]) => `<th>${l}</th>`).join('')}</tr></thead><tbody>${list}</tbody></table></div>` : '<p class="small muted">該当するレースはありません。</p>'}</div>`;
+    ${done.length ? `<div class="tbl-wrap stats-wide"><table class="t"><thead><tr><th class="l">レース</th><th>結果</th>${ALL_COLS.map(([, l]) => `<th>${l}</th>`).join('')}</tr></thead><tbody>${list}</tbody></table></div>` : '<p class="small muted">該当するレースはありません。</p>'}</div>`;
 }
 
 async function viewStats(sel) {

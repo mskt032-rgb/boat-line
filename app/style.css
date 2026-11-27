@@ -131,3 +131,6 @@ summary.h2 .hint { font-weight: 400; margin-left: 6px; }
 
 .clock { text-align: right; line-height: 1.25; }
 .upd { font-size: 11px; opacity: .85; }
+
+/* 成績の表: 列が多いので少し詰める */
+.stats-wide table.t th, .stats-wide table.t td { padding: 6px 3px; }
