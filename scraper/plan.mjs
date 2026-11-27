@@ -6,7 +6,7 @@ export const RULES = {
   preWindowMin: 25,         // 締切25分前から直前情報・オッズを取得
   preAfterMin: 0,           // 締切後は直前情報・オッズを取らない(締切時点の予想を書き換えないため)
   preRefetchMin: 8,         // 同じレースの直前情報・オッズは8分以上あけて取り直す
-  resultDelayMin: 8,        // 締切8分後から結果を取りにいく
+  resultDelayMin: 6,        // 締切6分後から結果を取りにいく(反映を早めるため)
   resultMaxAttempts: 8,     // 結果の取得を試す回数の上限
   resultGiveUpHours: 18,    // 締切から18時間を過ぎたら結果取得をあきらめる
   racelistPastMin: 10,      // 締切を10分以上過ぎたレースの出走表は「あとから取得」に回す(参考の予想用)

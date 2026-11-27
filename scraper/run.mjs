@@ -259,7 +259,7 @@ export async function runOnce({
   } catch (e) { runLog.errors.push(`予想の自動記録: ${e.message}`); }
   saveAll();
 
-  // 見張り: (1) 締切15分前を過ぎても展示が取れていないレースは展示を、(2) 締切5分前を過ぎたレースはオッズを、(3) 締切8分後を過ぎて結果がまだのレースは結果を、約1分半おきに取りにいく
+  // 見張り: (1) 締切15分前を過ぎても展示が取れていないレースは展示を、(2) 締切5分前を過ぎたレースはオッズを、(3) 締切6分後を過ぎて結果がまだのレースは結果を、約1分半おきに取りにいく
   if (watchUntilMs && !runLog.stopped?.includes('応答コード') && robots) {
     reqCap = runLog.requests + watchMaxRequests;
     timeEnd = watchUntilMs;
@@ -306,14 +306,14 @@ export async function runOnce({
           if (recordAutoPredictions(vdoc, today, clock(), (t) => readJson(path.join(store, 'racers', `${t}.json`), null))) markDirty(today, jcd);
           markDirty(today, jcd);
         }
-        // (3) 締切から8分以上たって結果がまだのレースは、結果を取りにいく(アプリへの反映を早めるため)
+        // (3) 締切から6分以上たって結果がまだのレースは、結果を取りにいく(アプリへの反映を早めるため)
         for (const [jcd, vdoc] of Object.entries(venueDocs[today] || {})) {
           for (const race of Object.values(vdoc.races || {})) {
             const dl = deadlineMs(today, race.deadline);
             const r0 = race.result || {};
             if (dl == null || r0.ready || r0.canceled || (r0.attempts || 0) >= 12) continue;
             const past = nowW - dl;
-            if (past < 8 * 60000 || past > 90 * 60000) continue;
+            if (past < 6 * 60000 || past > 90 * 60000) continue;
             if (r0.attemptedAt && nowW - Date.parse(r0.attemptedAt) < 90000) continue;
             const p = PATHS.raceresult(today, jcd, race.rno);
             const rec = { ...r0, attemptedAt: isoNow(clock()), source: BASE + p, attempts: (r0.attempts || 0) + 1 };
