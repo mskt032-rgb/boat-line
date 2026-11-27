@@ -239,3 +239,18 @@ test('締切5分前を過ぎたレースは、オッズを短い間隔で取り�
   assert.ok(Date.parse(v.races[1].odds.fetchedAt) >= deadlineMs(D, '10:25'));
   assert.ok(Date.parse(v.races[1].odds.fetchedAt) < deadlineMs(D, '10:30'));
 });
+
+test('見張りの間に、締切8分後を過ぎて結果がまだのレースの結果を取りにいく', async () => {
+  const store = tmp();
+  let t = deadlineMs(D, '07:00');
+  const clock = () => t;
+  let ready = false;
+  const base = fakeSite();
+  const fetchText = async (url) => (url.includes('/raceresult') && !ready ? { status: 200, text: '<html><body>データがありません</body></html>' } : base.fetchText(url));
+  const o = (now, extra = {}) => ({ store, now, fetchText, intervalMs: 0, clock, sleep: async (ms) => { t += ms; if (t >= deadlineMs(D, '10:42')) ready = true; }, ...extra });
+  await runOnce(o(t));
+  t = deadlineMs(D, '10:39');
+  await runOnce(o(t, { watchUntilMs: deadlineMs(D, '10:47') }));
+  const v = read(store, `${D}/02.json`);
+  assert.equal(v.races[1].result.ready, true);
+});
